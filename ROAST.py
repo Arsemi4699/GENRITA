@@ -40,12 +40,16 @@ class AnswerFilter:
     and span containment to find the best candidate answers.
     """
 
-    def _is_overlapping(self, answer1: Answer, answer2: Answer) -> bool:
-        if not all(hasattr(answer, 'meta') and 'start' in answer.meta and 'end' in answer.meta for answer in
-                   [answer1, answer2]):
+    @staticmethod
+    def _is_overlapping(answer1: Answer, answer2: Answer) -> bool:
+        """
+        Checks if one answer's span is fully contained within the other.
+        """
+        # CORRECTED: Use the .document_offset attribute.
+        if not all(hasattr(ans, 'document_offset') and ans.document_offset for ans in [answer1, answer2]):
             return False
-        start1, end1 = answer1.meta['start'], answer1.meta['end']
-        start2, end2 = answer2.meta['start'], answer2.meta['end']
+        start1, end1 = answer1.document_offset.start, answer1.document_offset.end
+        start2, end2 = answer2.document_offset.start, answer2.document_offset.end
         return (start1 >= start2 and end1 <= end2) or (start2 >= start1 and end2 <= end1)
 
     @component.output_types(filtered_answers=List[Answer])
@@ -74,7 +78,7 @@ class ExpertInstanceExtractor:
             self,
             model_name_or_path: str,
             device: Optional[str] = None,
-            reader_top_k: int = 20,  # Increased to get more candidates
+            reader_top_k: int = 20,
     ):
         self.q_gen = QuestionGenerator()
         self.reader = ExtractiveReader(model=model_name_or_path, device=device, top_k=reader_top_k, no_answer=True)
@@ -108,7 +112,7 @@ class ExpertInstanceExtractor:
 
         return True
 
-    def extract(self, context: str, abstract_concept: str) -> List[Tuple[str, float]]:
+    def extract(self, context: str, abstract_concept: str) -> List[Tuple[str, float, int, int]]:
         """
         Runs the full extraction and filtering pipeline.
         """
@@ -139,7 +143,7 @@ class ExpertInstanceExtractor:
                                    reverse=True)
 
         seen_strings = set()
-        results = []
+        results: List[Tuple[str, float, int, int]] = []
         for ans in ranked_candidates:
             if ans.data is None:
                 continue
@@ -148,7 +152,10 @@ class ExpertInstanceExtractor:
 
             if self._is_valid_instance(clean_span, abstract_concept):
                 if clean_span.lower() not in seen_strings:
-                    results.append((clean_span, round(ans.score, 4)))
+                    # CORRECTED: Get start and end from the .document_offset attribute.
+                    start_pos = ans.document_offset.start if ans.document_offset else -1
+                    end_pos = ans.document_offset.end if ans.document_offset else -1
+                    results.append((clean_span, round(ans.score, 4), start_pos, end_pos))
                     seen_strings.add(clean_span.lower())
 
         return results
@@ -193,7 +200,7 @@ if __name__ == "__main__":
              "abstract": "philosophical concept"},
             {"id": 11,
              "context": "Queen Denis is flying with her balck dragon, the Drago!",
-             "abstract": "philosophical concept"}
+             "abstract": "dragon"}
         ]
         for test in test_cases:
             print(f"\n--- Running Test Case {test['id']} ---")
@@ -201,10 +208,11 @@ if __name__ == "__main__":
             instances = extractor.extract(test['context'], test['abstract'])
             print(f"\n--- Found Instances (Test {test['id']}) ---")
             if instances:
-                for span, score in instances:
-                    print(f"- {span!r} (score: {score:.3f})")
+                for span, score, start, end in instances:
+                    print(f"- {span!r} (score: {score:.3f}) [pos: {start}-{end}]")
             else:
                 print("No instances found.")
     except Exception as e:
         logging.error(f"An error occurred during execution: {e}", exc_info=True)
         print("\nPlease ensure you have the required packages (`pip install farm-haystack haystack-ai`)")
+

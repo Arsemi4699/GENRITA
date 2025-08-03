@@ -79,7 +79,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dataset_path',
         type=str,
-        default=None,
+        default="data/cleaned_data_merged.csv",
         help='Path to a specific .csv file to resume training on this dataset.'
     )
     parser.add_argument(
