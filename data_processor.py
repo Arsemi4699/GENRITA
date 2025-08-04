@@ -27,7 +27,7 @@ class DataProcessor:
         print("DataProcessor initialized.")
 
     @staticmethod
-    def _clean_text(text):
+    def _clean_text(text, to_lower=True):
         """
         Performs basic text cleaning operations, including Markdown removal.
         - Converts to lowercase.
@@ -39,7 +39,10 @@ class DataProcessor:
         """
         if not isinstance(text, str):
             return ""
-        text = text.lower()
+
+        if to_lower:
+            text = text.lower()
+
         # Remove URLs
         text = re.sub(r'https?://\S+|www\.\S+', '', text)
         # Remove mentions and hashtags
