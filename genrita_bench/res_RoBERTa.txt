@@ -1,0 +1,45 @@
+
+==================================================
+PERFORMANCE REPORT FOR: NEURAL NETWORK (ROBERTA) DRIVER
+==================================================
+
+Overall Sense Accuracy: 85.00%
+
+Sense Classification Report:
+                          precision    recall  f1-score   support
+
+      Normal and neutral       0.82      0.90      0.86        10
+       Love and romantic       1.00      0.78      0.88         9
+          War and combat       0.64      1.00      0.78         9
+   Fantasy and mythology       0.67      0.89      0.76         9
+       Honor and respect       1.00      0.78      0.88         9
+       Drama and tragedy       0.75      1.00      0.86         9
+          City and Crowd       1.00      0.44      0.62         9
+Mountain and the heights       0.89      0.89      0.89         9
+        Desert and dunes       1.00      1.00      1.00         9
+           Sea and tides       1.00      0.89      0.94         9
+        Forest and tress       1.00      0.78      0.88         9
+
+                accuracy                           0.85       100
+               macro avg       0.89      0.85      0.85       100
+            weighted avg       0.89      0.85      0.85       100
+
+
+--------------------------------------------------
+
+Overall Age Accuracy: 80.00%
+
+Age Classification Report:
+                                                           precision    recall  f1-score   support
+
+                                      ancient and old age       0.70      0.88      0.78        32
+neutral and not special age (non-ancient, non technology)       0.89      0.62      0.73        39
+                                    technology modern age       0.85      0.97      0.90        29
+
+                                                 accuracy                           0.80       100
+                                                macro avg       0.81      0.82      0.80       100
+                                             weighted avg       0.82      0.80      0.79       100
+
+
+==================================================
+

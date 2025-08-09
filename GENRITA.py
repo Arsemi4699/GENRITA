@@ -2,11 +2,13 @@ import re
 import torch
 from abc import ABC, abstractmethod
 import ast
+import ollama
 import json
 import logging
-import ollama
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-from ROAST import TEST_CASES
 from model import RoBERTaMultiTaskClassifier
 from data_processor import DataProcessor
 
@@ -91,8 +93,8 @@ AGE_ID_TO_NAME = {v: k for k, v in AGE_CLASSES.items()}
 
 AGE_PROMPT_TEMPLATE = """
 # System:
-**Role**: You are an `age/temporal-period` classifier model.  
-**Output**: The output should be a `dict` of the probability (preds) of belonging to a class. if no class is matched you will score on top to `"neutral and not special age (non-ancient, non technology)"`.
+**Role**: You are an `age/temporal-period` classifier model.
+**Task**: Analyze the provided "context" and return a dictionary of class probabilities.
 
 # samples:
 
@@ -151,9 +153,20 @@ AGE_PROMPT_TEMPLATE = """
     "technology modern age": 2,
 }}
 
-# problem: Fill following Question Marks (?) with suitable classified Probability values (float between 0.0 and 1.0) for each class based on "context". your output structure must be exactly like and only contains following "preds": 
+# Problem:
+Classify the following "context".
 
 - "context": "{text_content}"
+
+**IMPORTANT INSTRUCTIONS**:
+1.  Your response **MUST** be a single, valid JSON object.
+2.  Do **NOT** include any explanations, conversation, or markdown formatting like ```json.
+3.  The JSON object must contain a single key, "preds", whose value is a dictionary of the classes and their probabilities.
+4.  All probability values **MUST** be floats between 0.0 and 1.0.
+5.  The sum of all probabilities should be 1.0.
+6.  Do **NOT** use '?' or any non-numeric values. If a class has zero probability, use `0.0`.
+
+Your entire output must be **ONLY** the JSON object, structured like this:
 + "preds": {{
     "ancient and old age": ?,
     "neutral and not special age (non-ancient, non technology)": ?,
@@ -164,7 +177,7 @@ AGE_PROMPT_TEMPLATE = """
 SENSE_PROMPT_TEMPLATE = """
 # System:
 **Role**: You are an `sense/genre/theme` classifier model.  
-**Output**: The output should be a `dict` of the probability (preds) of belonging to a class.  if no class is matched you will score on top to `"Normal and neutral"`.
+**Task**: Analyze the provided "context" and return a dictionary of class probabilities.
 
 # samples:
 
@@ -264,9 +277,19 @@ SENSE_PROMPT_TEMPLATE = """
      "Sea and tides": 9, "Forest and tress": 10,
 }}
 
-# problem: Fill following Question Marks (?) with suitable classified Probability values (float between 0.0 and 1.0) for each class based on "context". your output structure must be exactly like and only contains following "preds":
+# Problem:
+Classify the following "context".
 
 - "context": "{text_content}"
+
+**IMPORTANT INSTRUCTIONS**:
+1.  Your response **MUST** be a single, valid JSON object.
+2.  Do **NOT** include any explanations, conversation, or markdown formatting like ```json.
+3.  The JSON object must contain a single key, "preds", whose value is a dictionary of the classes and their probabilities.
+4.  All probability values **MUST** be floats between 0.0 and 1.0.
+5.  Do **NOT** use '?' or any non-numeric values. If a class has zero probability, use `0.0`.
+
+Your entire output must be **ONLY** the JSON object, structured like this:
 + "preds": {{
     "Normal and neutral": ?,
     "Love and romantic": ?,
@@ -396,22 +419,102 @@ class LLMDriver(GENRITADriver):
             logging.error(f"Failed to connect to Ollama. Is the Ollama service running? Error: {e}")
             raise
 
-    def _call_llm(self, prompt: str) -> dict:
+    # def _call_llm(self, prompt: str) -> dict:
+    #     """
+    #     Sends a prompt to the Ollama model and safely evaluates the Python dict-like string response.
+    #     """
+    #     try:
+    #         response = self.client.generate(model=self.model_name, prompt=prompt)
+    #         parsed_dict = self.response_cleaner(response)
+    #         # response_text = response['response'].strip()
+    #         # parsed_dict = self._parse_llm_response(response_text)
+    #
+    #         if not isinstance(parsed_dict, dict):
+    #             logging.warning(f"Parsed output is not a dictionary. Type: {type(parsed_dict)}. Output: {parsed_dict}")
+    #             return {}
+    #
+    #         return parsed_dict
+    #
+    #     except Exception as e:
+    #         logging.error(f"An error occurred while calling the LLM: {e}")
+    #         return {}
+
+    def _call_llm(self, prompt: str, max_tries: int = 3) -> dict:
         """
-        Sends a prompt to the Ollama model and safely evaluates the Python dict-like string response.
+        Sends a prompt to the Ollama model and evaluates the response.
+        Retries generating a new response if the output is not parsable.
+        Does NOT retry on underlying API/connection errors.
         """
         try:
-            response = self.client.generate(model=self.model_name, prompt=prompt)
-            parsed_dict = self.response_cleaner(response)
-            if not isinstance(parsed_dict, dict):
-                logging.warning(f"Parsed output is not a dictionary. Type: {type(parsed_dict)}. Output: {parsed_dict}")
-                return {}
+            for attempt in range(max_tries):
+                # The API call is inside the loop to get a new response on each attempt.
+                response = self.client.generate(model=self.model_name, prompt=prompt)
+                parsed_dict = self.response_cleaner(response)
 
-            return parsed_dict
+                # On successful parsing, return the result immediately.
+                if parsed_dict and isinstance(parsed_dict, dict):
+                    return parsed_dict
+
+                # If parsing failed, log it. The loop will then make a new attempt.
+                logging.warning(
+                    f"LLM output was not parsable on attempt {attempt + 1}/{max_tries}. Retrying generation."
+                )
+
+            # This point is reached only if all attempts to get a parsable output failed.
+            logging.error(f"Failed to get a parsable response from LLM after {max_tries} attempts.")
+            return {}
 
         except Exception as e:
-            logging.error(f"An error occurred while calling the LLM: {e}")
+            # This catches non-retriable errors like network issues or Ollama service failures.
+            # The function fails immediately without retrying.
+            logging.error(f"A non-retriable API error occurred, stopping immediately: {e}")
             return {}
+
+    def _parse_llm_response(self, response_text: str) -> dict:
+        """
+        Robustly parses the LLM's response to find and decode a JSON object.
+        Handles surrounding text, markdown, and minor format errors.
+        """
+        # 1. Use regex to greedily find a JSON-like object. This is great for
+        # extracting a JSON blob from within conversational text.
+        match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if not match:
+            logging.warning(f"Parser could not find a JSON-like object in the response: {response_text}")
+            return {}
+
+        json_str = match.group(0)
+
+        # 2. Try to parse the extracted string using the standard `json` library.
+        try:
+            parsed_dict = json.loads(json_str)
+        except json.JSONDecodeError:
+            # If standard JSON parsing fails, it might be due to single quotes or other
+            # Python-isms. Use `ast.literal_eval` as a safer fallback than `eval()`.
+            try:
+                # Replace non-breaking spaces which can cause parsing errors
+                json_str_cleaned = json_str.replace('\u00a0', ' ')
+                parsed_dict = ast.literal_eval(json_str_cleaned)
+            except (ValueError, SyntaxError, MemoryError) as e:
+                logging.warning(f"Both json.loads and ast.literal_eval failed. Error: {e}. Raw string: {json_str}")
+                return {}
+
+        # 3. Standardize the output structure. Sometimes models will nest the
+        # result inside `{"preds": {...}}`. We just want the inner dictionary.
+        if isinstance(parsed_dict, dict) and 'preds' in parsed_dict and isinstance(parsed_dict['preds'], dict):
+            final_dict = parsed_dict['preds']
+        else:
+            final_dict = parsed_dict
+
+        # 4. Final cleaning: Ensure all values are floats and discard any that aren't.
+        # This gracefully handles cases where the model might output "?" or other text.
+        cleaned_dict = {}
+        for key, value in final_dict.items():
+            try:
+                cleaned_dict[str(key)] = float(value)
+            except (ValueError, TypeError):
+                logging.warning(f"Could not convert value '{value}' for key '{key}'. Discarding this entry.")
+                continue
+        return cleaned_dict
 
     def response_cleaner(self, response: ollama.GenerateResponse):
         response_text = response['response'].strip()
@@ -1608,3 +1711,216 @@ TEST_CASES = [
         }
     }
 ]
+#
+# def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
+#     """
+#     Evaluates a given classifier driver against a set of test cases.
+#
+#     Args:
+#         driver (GENRITADriver): An instance of a classifier driver (NNDriver or LLMDriver).
+#         test_cases (list): A list of test case dictionaries.
+#
+#     Returns:
+#         dict: A dictionary containing performance metrics (accuracies, confusion matrices, reports).
+#     """
+#     logging.info(f"Starting evaluation for {type(driver).__name__}...")
+#
+#     y_true_sense, y_pred_sense = [], []
+#     y_true_age, y_pred_age = [], []
+#
+#     for i, case in enumerate(test_cases):
+#         text = case.get("text")
+#         true_sense_id = case.get("sense_prediction", {}).get("class_id")
+#         true_age_id = case.get("age_prediction", {}).get("class_id")
+#
+#         if text is None or true_sense_id is None or true_age_id is None:
+#             logging.warning(f"Skipping malformed test case #{i}: {case}")
+#             continue
+#
+#         try:
+#             # Get predictions from the driver
+#             predictions = driver.classify(text)
+#             pred_sense_id = predictions.get("sense_prediction", {}).get("class_id", -1)
+#             pred_age_id = predictions.get("age_prediction", {}).get("class_id", -1)
+#
+#             # Append true and predicted labels for metrics calculation
+#             y_true_sense.append(true_sense_id)
+#             y_pred_sense.append(pred_sense_id)
+#             y_true_age.append(true_age_id)
+#             y_pred_age.append(pred_age_id)
+#
+#             logging.info(f"Processed case {i+1}/{len(test_cases)}")
+#
+#         except Exception as e:
+#             logging.error(f"Failed to classify text for case #{i}. Error: {e}")
+#             # Append -1 to indicate failure for this case
+#             y_pred_sense.append(-1)
+#             y_pred_age.append(-1)
+#             y_true_sense.append(true_sense_id)
+#             y_true_age.append(true_age_id)
+#
+#
+#     # --- Calculate Metrics ---
+#     # Note: We use the labels present in the data for reports
+#     unique_sense_labels = sorted(list(set(y_true_sense)))
+#     unique_age_labels = sorted(list(set(y_true_age)))
+#
+#     sense_class_names = [SENSE_ID_TO_NAME.get(i, "Unknown") for i in unique_sense_labels]
+#     age_class_names = [AGE_ID_TO_NAME.get(i, "Unknown") for i in unique_age_labels]
+#
+#     results = {
+#         "sense_accuracy": accuracy_score(y_true_sense, y_pred_sense),
+#         "age_accuracy": accuracy_score(y_true_age, y_pred_age),
+#         "sense_confusion_matrix": confusion_matrix(y_true_sense, y_pred_sense, labels=unique_sense_labels),
+#         "age_confusion_matrix": confusion_matrix(y_true_age, y_pred_age, labels=unique_age_labels),
+#         "sense_classification_report": classification_report(y_true_sense, y_pred_sense, target_names=sense_class_names, zero_division=0),
+#         "age_classification_report": classification_report(y_true_age, y_pred_age, target_names=age_class_names, zero_division=0),
+#         "sense_class_names": sense_class_names,
+#         "age_class_names": age_class_names
+#     }
+#     logging.info("Evaluation complete.")
+#     return results
+#
+
+def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
+    """
+    Evaluates a given classifier driver against a set of test cases.
+    """
+    logging.info(f"Starting evaluation for {type(driver).__name__}...")
+
+    y_true_sense, y_pred_sense = [], []
+    y_true_age, y_pred_age = [], []
+
+    for i, case in enumerate(test_cases):
+        text = case.get("text")
+        true_sense_id = case.get("sense_prediction", {}).get("class_id")
+        true_age_id = case.get("age_prediction", {}).get("class_id")
+
+        if text is None or true_sense_id is None or true_age_id is None:
+            logging.warning(f"Skipping malformed test case #{i}: {case}")
+            continue
+
+        try:
+            predictions = driver.classify(text)
+            pred_sense_id = predictions.get("sense_prediction", {}).get("class_id", -1)
+            pred_age_id = predictions.get("age_prediction", {}).get("class_id", -1)
+
+            y_true_sense.append(true_sense_id)
+            y_pred_sense.append(pred_sense_id)
+            y_true_age.append(true_age_id)
+            y_pred_age.append(pred_age_id)
+
+            logging.info(f"Processed case {i + 1}/{len(test_cases)}")
+
+        except Exception as e:
+            logging.error(f"Failed to classify text for case #{i}. Error: {e}")
+            y_pred_sense.append(-1)
+            y_pred_age.append(-1)
+            y_true_sense.append(true_sense_id)
+            y_true_age.append(true_age_id)
+
+    # --- Calculate Metrics ---
+    # Define the full set of labels based on ground truth, and add our failure case label (-1)
+    sense_labels = sorted(list(SENSE_CLASSES.values()))
+    age_labels = sorted(list(AGE_CLASSES.values()))
+
+    report_sense_labels = sense_labels + [-1]
+    report_age_labels = age_labels + [-1]
+
+    sense_class_names = [SENSE_ID_TO_NAME.get(i, "Unknown") for i in sense_labels]
+    age_class_names = [AGE_ID_TO_NAME.get(i, "Unknown") for i in age_labels]
+
+    report_sense_names = sense_class_names + ["Failed Parse"]
+    report_age_names = age_class_names + ["Failed Parse"]
+
+    results = {
+        "sense_accuracy": accuracy_score(y_true_sense, y_pred_sense),
+        "age_accuracy": accuracy_score(y_true_age, y_pred_age),
+        "sense_confusion_matrix": confusion_matrix(y_true_sense, y_pred_sense, labels=report_sense_labels),
+        "age_confusion_matrix": confusion_matrix(y_true_age, y_pred_age, labels=report_age_labels),
+        "sense_classification_report": classification_report(
+            y_true_sense, y_pred_sense, labels=report_sense_labels, target_names=report_sense_names, zero_division=0
+        ),
+        "age_classification_report": classification_report(
+            y_true_age, y_pred_age, labels=report_age_labels, target_names=report_age_names, zero_division=0
+        ),
+        "sense_class_names": report_sense_names,
+        "age_class_names": report_age_names
+    }
+    logging.info("Evaluation complete.")
+    return results
+
+def plot_performance(results: dict, driver_name: str):
+    """
+    Prints reports and plots confusion matrices for the evaluation results.
+
+    Args:
+        results (dict): The dictionary of results from the evaluate_classifier function.
+        driver_name (str): The name of the driver being evaluated (e.g., "NN" or "LLM").
+    """
+    print("\n" + "="*50)
+    print(f"PERFORMANCE REPORT FOR: {driver_name.upper()} DRIVER")
+    print("="*50 + "\n")
+
+    # --- Print Reports ---
+    print(f"Overall Sense Accuracy: {results['sense_accuracy']:.2%}")
+    print("\nSense Classification Report:")
+    print(results['sense_classification_report'])
+    print("\n" + "-"*50 + "\n")
+    print(f"Overall Age Accuracy: {results['age_accuracy']:.2%}")
+    print("\nAge Classification Report:")
+    print(results['age_classification_report'])
+    print("\n" + "="*50 + "\n")
+
+    # --- Plot Confusion Matrices ---
+    fig, axes = plt.subplots(1, 2, figsize=(22, 10))
+    fig.suptitle(f'Confusion Matrices for {driver_name.upper()} Driver', fontsize=20)
+
+    # Sense Confusion Matrix
+    sns.heatmap(results['sense_confusion_matrix'], annot=True, fmt='d', cmap='Blues', ax=axes[0],
+                xticklabels=results['sense_class_names'], yticklabels=results['sense_class_names'])
+    axes[0].set_title('Sense Prediction', fontsize=16)
+    axes[0].set_xlabel('Predicted Label', fontsize=12)
+    axes[0].set_ylabel('True Label', fontsize=12)
+    plt.setp(axes[0].get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.setp(axes[0].get_yticklabels(), rotation=0)
+
+
+    # Age Confusion Matrix
+    sns.heatmap(results['age_confusion_matrix'], annot=True, fmt='d', cmap='Greens', ax=axes[1],
+                xticklabels=results['age_class_names'], yticklabels=results['age_class_names'])
+    axes[1].set_title('Age Prediction', fontsize=16)
+    axes[1].set_xlabel('Predicted Label', fontsize=12)
+    axes[1].set_ylabel('True Label', fontsize=12)
+    plt.setp(axes[1].get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    plt.setp(axes[1].get_yticklabels(), rotation=0)
+
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(f"./genrita_bench/Overall GENRITA {driver_name}.png", dpi=300, bbox_inches="tight")
+    # plt.show()
+
+if __name__ == '__main__':
+    NN_DRIVER_PARAMS = {
+        "checkpoint_path": "./checkpoints/best-model.ckpt"
+    }
+    LLM_DRIVER_PARAMS = {
+        "ollama_model_name": "phi4-mini"
+    }
+    driver = "llm"
+
+    try:
+        if driver == 'nn':
+            driver_instance = GENRITADriver.get_classifer('nn', NN_DRIVER_PARAMS)
+            driver_name = "Neural Network (RoBERTa)"
+        else: # args.driver == 'llm'
+            driver_instance = GENRITADriver.get_classifer('llm', LLM_DRIVER_PARAMS)
+            driver_name = f"Large Language Model ({LLM_DRIVER_PARAMS['ollama_model_name']})"
+
+        evaluation_results = evaluate_classifier(driver_instance, TEST_CASES)
+
+        plot_performance(evaluation_results, driver_name)
+
+    except (FileNotFoundError, ImportError, Exception) as e:
+        logging.error(f"Evaluation script failed. Reason: {e}")
+

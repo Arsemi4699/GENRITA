@@ -1,0 +1,47 @@
+
+==================================================
+PERFORMANCE REPORT FOR: LARGE LANGUAGE MODEL (PHI4-MINI) DRIVER
+==================================================
+
+Overall Sense Accuracy: 62.00%
+
+Sense Classification Report:
+                          precision    recall  f1-score   support
+
+      Normal and neutral       0.50      0.80      0.62        10
+       Love and romantic       1.00      0.67      0.80         9
+          War and combat       0.50      1.00      0.67         9
+   Fantasy and mythology       0.46      0.67      0.55         9
+       Honor and respect       1.00      0.33      0.50         9
+       Drama and tragedy       0.83      0.56      0.67         9
+          City and Crowd       0.80      0.89      0.84         9
+Mountain and the heights       0.53      0.89      0.67         9
+        Desert and dunes       1.00      0.33      0.50         9
+           Sea and tides       0.80      0.44      0.57         9
+        Forest and tress       0.50      0.22      0.31         9
+            Failed Parse       0.00      0.00      0.00         0
+
+                accuracy                           0.62       100
+               macro avg       0.66      0.57      0.56       100
+            weighted avg       0.72      0.62      0.61       100
+
+
+--------------------------------------------------
+
+Overall Age Accuracy: 54.00%
+
+Age Classification Report:
+                                                           precision    recall  f1-score   support
+
+                                      ancient and old age       0.51      0.56      0.54        32
+neutral and not special age (non-ancient, non technology)       0.57      0.44      0.49        39
+                                    technology modern age       0.61      0.66      0.63        29
+                                             Failed Parse       0.00      0.00      0.00         0
+
+                                                 accuracy                           0.54       100
+                                                macro avg       0.42      0.41      0.42       100
+                                             weighted avg       0.56      0.54      0.55       100
+
+
+==================================================
+

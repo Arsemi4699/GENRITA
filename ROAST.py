@@ -1348,22 +1348,22 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     MODEL_OPTS = [
-        # ("QA_RoBERTA_SQUADv2", "nn"),
+        ("QA_RoBERTA_SQUADv2", "nn"),
         ("QA_XLM_RoBERTA", "nn"),
-        # ("gemma3:1b", "llm"),
-        # ("llama3.2", "llm"),
-        # ("phi4-mini", "llm"),
-        # ("gemma3", "llm"),
-        # ("gemma3:12b", "llm")
+        ("gemma3:1b", "llm"),
+        ("llama3.2", "llm"),
+        ("phi4-mini", "llm"),
+        ("gemma3", "llm"),
+        ("gemma3:12b", "llm")
     ]
 
-    # MODEL_NAME, DRIVER = "QA_RoBERTA_SQUADv2", # score_threshold=0.3
-    # MODEL_NAME, DRIVER = "QA_XLM_RoBERTA" # score_threshold=0.3
-    # MODEL_NAME, DRIVER = "gemma3:1b"   # 1   B
-    # MODEL_NAME, DRIVER = "llama3.2"    # 3.2 B
-    # MODEL_NAME, DRIVER = "phi4-mini"   # 3.8 B
-    # MODEL_NAME, DRIVER = "gemma3"      # 4.3 B
-    # MODEL_NAME, DRIVER = "gemma3:12b"  # 12  B
+    # MODEL_NAME = "QA_RoBERTA_SQUADv2", # score_threshold=0.3
+    # MODEL_NAME = "QA_XLM_RoBERTA" # score_threshold=0.3
+    # MODEL_NAME = "gemma3:1b"   # 1   B
+    # MODEL_NAME = "llama3.2"    # 3.2 B
+    # MODEL_NAME = "phi4-mini"   # 3.8 B
+    # MODEL_NAME = "gemma3"      # 4.3 B
+    # MODEL_NAME = "gemma3:12b"  # 12  B
 
     for MODEL_NAME, DRIVER in MODEL_OPTS:
         print(f"\nInitializing expert extractor with model: {MODEL_NAME}...")
