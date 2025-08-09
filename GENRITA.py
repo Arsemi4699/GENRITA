@@ -406,11 +406,12 @@ class LLMDriver(GENRITADriver):
     This version uses ast.literal_eval for robust parsing of the LLM's output.
     """
 
-    def __init__(self, ollama_model_name: str):
+    def __init__(self, ollama_model_name: str, max_retries: int = 3):
         logging.info("--- Initializing LLM Driver ---")
         if ollama is None:
             raise ImportError("The 'ollama' library is required. Please run 'pip install ollama'.")
         self.client = ollama.Client()
+        self.max_retries = max_retries
         self.model_name = ollama_model_name
         try:
             self.client.list()
@@ -439,14 +440,14 @@ class LLMDriver(GENRITADriver):
     #         logging.error(f"An error occurred while calling the LLM: {e}")
     #         return {}
 
-    def _call_llm(self, prompt: str, max_tries: int = 3) -> dict:
+    def _call_llm(self, prompt: str) -> dict:
         """
         Sends a prompt to the Ollama model and evaluates the response.
         Retries generating a new response if the output is not parsable.
         Does NOT retry on underlying API/connection errors.
         """
         try:
-            for attempt in range(max_tries):
+            for attempt in range(self.max_retries):
                 # The API call is inside the loop to get a new response on each attempt.
                 response = self.client.generate(model=self.model_name, prompt=prompt)
                 parsed_dict = self.response_cleaner(response)
@@ -457,11 +458,11 @@ class LLMDriver(GENRITADriver):
 
                 # If parsing failed, log it. The loop will then make a new attempt.
                 logging.warning(
-                    f"LLM output was not parsable on attempt {attempt + 1}/{max_tries}. Retrying generation."
+                    f"LLM output was not parsable on attempt {attempt + 1}/{self.max_retries}. Retrying generation."
                 )
 
             # This point is reached only if all attempts to get a parsable output failed.
-            logging.error(f"Failed to get a parsable response from LLM after {max_tries} attempts.")
+            logging.error(f"Failed to get a parsable response from LLM after {self.max_retries} attempts.")
             return {}
 
         except Exception as e:
