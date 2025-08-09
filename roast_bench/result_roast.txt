@@ -1,0 +1,42 @@
+
+Initializing expert extractor with model: QA_RoBERTA_SQUADv2...
+Overall Precision: 0.716
+Overall Recall: 0.618
+Overall F1: 0.664
+total Time (sec): 2
+
+Initializing expert extractor with model: QA_XLM_RoBERTA...
+Overall Precision: 0.811
+Overall Recall: 0.552
+Overall F1: 0.657
+total Time (sec): 7
+
+Initializing expert extractor with model: gemma3:1b...
+Overall Precision: 0.935
+Overall Recall: 0.963
+Overall F1: 0.949
+total Time (sec): 29
+
+Initializing expert extractor with model: llama3.2...
+Overall Precision: 0.96
+Overall Recall: 0.996
+Overall F1: 0.978
+total Time (sec): 30
+
+Initializing expert extractor with model: phi4-mini...
+Overall Precision: 0.992
+Overall Recall: 0.975
+Overall F1: 0.983
+total Time (sec): 41
+
+Initializing expert extractor with model: gemma3...
+Overall Precision: 0.955
+Overall Recall: 0.967
+Overall F1: 0.961
+total Time (sec): 51
+
+Initializing expert extractor with model: gemma3:12b...
+Overall Precision: 0.964
+Overall Recall: 1.0
+Overall F1: 0.982
+total Time (sec): 787
