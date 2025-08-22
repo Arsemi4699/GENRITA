@@ -11,7 +11,9 @@ class TextDataset(Dataset):
     Custom PyTorch Dataset for loading text and multi-task labels.
     """
 
-    def __init__(self, data: pd.DataFrame, tokenizer: RobertaTokenizer, max_token_len: int):
+    def __init__(
+        self, data: pd.DataFrame, tokenizer: RobertaTokenizer, max_token_len: int
+    ):
         self.tokenizer = tokenizer
         self.data = data
         self.max_token_len = max_token_len
@@ -33,7 +35,7 @@ class TextDataset(Dataset):
             padding="max_length",
             truncation=True,
             return_attention_mask=True,
-            return_tensors='pt',
+            return_tensors="pt",
         )
 
         return dict(
@@ -41,7 +43,7 @@ class TextDataset(Dataset):
             input_ids=encoding["input_ids"].flatten(),
             attention_mask=encoding["attention_mask"].flatten(),
             sense_labels=torch.tensor(sense_label, dtype=torch.long),
-            age_labels=torch.tensor(age_label, dtype=torch.long)
+            age_labels=torch.tensor(age_label, dtype=torch.long),
         )
 
 
@@ -51,7 +53,14 @@ class TextDataModule(pl.LightningDataModule):
     This version uses stratified splitting to maintain class distribution.
     """
 
-    def __init__(self, data_path: str, batch_size: int, max_token_len: int, model_name: str, random_state: int):
+    def __init__(
+        self,
+        data_path: str,
+        batch_size: int,
+        max_token_len: int,
+        model_name: str,
+        random_state: int,
+    ):
         super().__init__()
         self.data_path = data_path
         self.batch_size = batch_size
@@ -70,7 +79,7 @@ class TextDataModule(pl.LightningDataModule):
 
         # NEW: Using stratified splitting to preserve class distribution across sets.
         # We stratify by 'sense_class_id' as it has more classes.
-        stratify_col = 'sense_class_id'
+        stratify_col = "sense_class_id"
 
         # Check if stratification is possible
         if df[stratify_col].nunique() < 2:
@@ -80,10 +89,7 @@ class TextDataModule(pl.LightningDataModule):
             stratify_param = df[stratify_col]
 
         train_val_df, self.test_df = train_test_split(
-            df,
-            test_size=0.1,
-            random_state=self.random_state,
-            stratify=stratify_param
+            df, test_size=0.1, random_state=self.random_state, stratify=stratify_param
         )
 
         if stratify_param is not None:
@@ -95,22 +101,33 @@ class TextDataModule(pl.LightningDataModule):
             train_val_df,
             test_size=0.111,  # 0.111 * 0.9 ~= 0.1 of total
             random_state=self.random_state,
-            stratify=stratify_param_val
+            stratify=stratify_param_val,
         )
 
         print("Data loaded and split using stratification.")
         print(f"Total samples: {len(df)}")
         print(
-            f"Train samples: {len(self.train_df)}, Val samples: {len(self.val_df)}, Test samples: {len(self.test_df)}")
+            f"Train samples: {len(self.train_df)}, Val samples: {len(self.val_df)}, Test samples: {len(self.test_df)}"
+        )
 
     def train_dataloader(self):
         dataset = TextDataset(self.train_df, self.tokenizer, self.max_token_len)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, persistent_workers=True)
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=4,
+            persistent_workers=True,
+        )
 
     def val_dataloader(self):
         dataset = TextDataset(self.val_df, self.tokenizer, self.max_token_len)
-        return DataLoader(dataset, batch_size=self.batch_size, num_workers=4, persistent_workers=True)
+        return DataLoader(
+            dataset, batch_size=self.batch_size, num_workers=4, persistent_workers=True
+        )
 
     def test_dataloader(self):
         dataset = TextDataset(self.test_df, self.tokenizer, self.max_token_len)
-        return DataLoader(dataset, batch_size=self.batch_size, num_workers=4, persistent_workers=True)
+        return DataLoader(
+            dataset, batch_size=self.batch_size, num_workers=4, persistent_workers=True
+        )

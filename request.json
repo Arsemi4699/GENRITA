@@ -1,0 +1,12 @@
+{
+  "title": "Potter Book",
+  "classifier_driver": "nn",
+  "extractor_driver": "llm",
+  "confidence_threshold": 0.85,
+  "nn_checkpoint_path": "checkpoints/best-model.ckpt",
+  "llm_ollama_model": "phi4-mini",
+  "roast_model_path": "phi4-mini",
+  "target_abstracts": {
+    "Basilisk": "a monstrous serpent, enormous in size, with shimmering green scales that slide coldly across the stone floors of the Chamber, and eyes like blazing yellow lamps that radiate a terrible, paralyzing power. When it moves, it gives off an unsettling hiss that seems to echo in the pipes and walls, filling the air with dread. Its fangs are long, gleaming, and dripping with deadly venom, making its very breath feel poisonous. The sheer size of its coiling body makes it feel ancient and unstoppable, and the atmosphere around it is heavy with the sense of death and fear, so that just being near it chills the air and makes the chamber seem darker and more suffocating."
+  }
+}

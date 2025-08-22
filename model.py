@@ -7,6 +7,7 @@ from torch.optim import AdamW
 
 from data_processor import DataProcessor
 
+
 class ClassificationHead(nn.Module):
     """A more advanced classification head with multiple layers and dropout."""
 
@@ -29,32 +30,55 @@ class ClassificationHead(nn.Module):
 class RoBERTaMultiTaskClassifier(pl.LightningModule):
     """The main model class with advanced heads, comprehensive metrics, and a predict method."""
 
-    def __init__(self, model_name: str, n_sense_classes: int, n_age_classes: int, learning_rate: float,
-                 n_training_steps: int, n_warmup_steps: int, max_token_len: int = 128):
+    def __init__(
+        self,
+        model_name: str,
+        n_sense_classes: int,
+        n_age_classes: int,
+        learning_rate: float,
+        n_training_steps: int,
+        n_warmup_steps: int,
+        max_token_len: int = 128,
+    ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.roberta = RobertaModel.from_pretrained(model_name, return_dict=True, local_files_only=True)
+        self.roberta = RobertaModel.from_pretrained(
+            model_name, return_dict=True, local_files_only=True
+        )
         # Tokenizer needs to be part of the model for easy prediction
-        self.tokenizer = RobertaTokenizer.from_pretrained(model_name, local_files_only=True)
+        self.tokenizer = RobertaTokenizer.from_pretrained(
+            model_name, local_files_only=True
+        )
 
-        self.sense_classifier = ClassificationHead(self.roberta.config.hidden_size, n_sense_classes)
-        self.age_classifier = ClassificationHead(self.roberta.config.hidden_size, n_age_classes)
+        self.sense_classifier = ClassificationHead(
+            self.roberta.config.hidden_size, n_sense_classes
+        )
+        self.age_classifier = ClassificationHead(
+            self.roberta.config.hidden_size, n_age_classes
+        )
 
         self.criterion = nn.CrossEntropyLoss()
 
-        metric_collection = lambda num_classes, prefix: torchmetrics.MetricCollection({
-            'acc': torchmetrics.Accuracy(task="multiclass", num_classes=num_classes),
-            'f1': torchmetrics.F1Score(task="multiclass", num_classes=num_classes, average='macro'),
-        }, prefix=prefix)
+        metric_collection = lambda num_classes, prefix: torchmetrics.MetricCollection(
+            {
+                "acc": torchmetrics.Accuracy(
+                    task="multiclass", num_classes=num_classes
+                ),
+                "f1": torchmetrics.F1Score(
+                    task="multiclass", num_classes=num_classes, average="macro"
+                ),
+            },
+            prefix=prefix,
+        )
 
-        self.train_sense_metrics = metric_collection(n_sense_classes, 'train_sense_')
-        self.val_sense_metrics = metric_collection(n_sense_classes, 'val_sense_')
-        self.test_sense_metrics = metric_collection(n_sense_classes, 'test_sense_')
+        self.train_sense_metrics = metric_collection(n_sense_classes, "train_sense_")
+        self.val_sense_metrics = metric_collection(n_sense_classes, "val_sense_")
+        self.test_sense_metrics = metric_collection(n_sense_classes, "test_sense_")
 
-        self.train_age_metrics = metric_collection(n_age_classes, 'train_age_')
-        self.val_age_metrics = metric_collection(n_age_classes, 'val_age_')
-        self.test_age_metrics = metric_collection(n_age_classes, 'test_age_')
+        self.train_age_metrics = metric_collection(n_age_classes, "train_age_")
+        self.val_age_metrics = metric_collection(n_age_classes, "val_age_")
+        self.test_age_metrics = metric_collection(n_age_classes, "test_age_")
 
     def forward(self, input_ids, attention_mask):
         output = self.roberta(input_ids=input_ids, attention_mask=attention_mask)
@@ -74,7 +98,14 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         total_loss, sense_logits, age_logits = self._shared_step(batch)
-        self.log("train_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log(
+            "train_loss",
+            total_loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
         self.train_sense_metrics.update(sense_logits, batch["sense_labels"])
         self.train_age_metrics.update(age_logits, batch["age_labels"])
         return total_loss
@@ -114,9 +145,11 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=self.hparams.n_warmup_steps,
-            num_training_steps=self.hparams.n_training_steps
+            num_training_steps=self.hparams.n_training_steps,
         )
-        return dict(optimizer=optimizer, lr_scheduler=dict(scheduler=scheduler, interval='step'))
+        return dict(
+            optimizer=optimizer, lr_scheduler=dict(scheduler=scheduler, interval="step")
+        )
 
     def predict(self, text: str, sense_id_map: dict, age_id_map: dict):
         """
@@ -137,7 +170,7 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
             padding="max_length",
             truncation=True,
             return_attention_mask=True,
-            return_tensors='pt',
+            return_tensors="pt",
         )
 
         input_ids = encoding["input_ids"].to(self.device)
@@ -163,11 +196,11 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
             "sense_prediction": {
                 "class_name": sense_pred_name,
                 "class_id": sense_pred_id,
-                "confidence": sense_probs.max().item()
+                "confidence": sense_probs.max().item(),
             },
             "age_prediction": {
                 "class_name": age_pred_name,
                 "class_id": age_pred_id,
-                "confidence": age_probs.max().item()
-            }
+                "confidence": age_probs.max().item(),
+            },
         }
