@@ -8,7 +8,7 @@ import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-
+import numpy as np
 from model import RoBERTaMultiTaskClassifier
 from data_processor import DataProcessor
 
@@ -339,7 +339,7 @@ class GENRITADriver(ABC):
     @abstractmethod
     def classify(
         self, text: str, allowed_senses: set = None, allowed_ages: set = None
-    ) -> dict:
+    ) -> tuple[dict, dict, np.ndarray, np.ndarray]:
         """
         Processes a text string and returns classification predictions for sense and age.
 
@@ -352,6 +352,36 @@ class GENRITADriver(ABC):
             dict: A dictionary containing 'sense_prediction' and 'age_prediction'.
         """
         pass
+
+    def _apply_allowed_ids_filter(
+        self,
+        probs_array: np.ndarray,
+        allowed_ids: set,
+        always_allowed_id: int,  # e.g., 0 for sense's neutral, 1 for age's neutral
+    ) -> np.ndarray:
+        """
+        Zeros out probabilities for disallowed classes and re-normalizes the vector.
+        The 'always_allowed_id' (like the neutral class) is never zeroed out.
+        """
+        if not allowed_ids:
+            return probs_array  # No filter to apply
+
+        # Create a copy to avoid modifying the original array
+        filtered_probs = probs_array.copy()
+
+        # Add the always-allowed ID to the set for easier checking
+        allowed_ids_with_neutral = allowed_ids.union({always_allowed_id})
+
+        for class_id in range(len(filtered_probs)):
+            if class_id not in allowed_ids_with_neutral:
+                filtered_probs[class_id] = 0.0
+
+        # Re-normalize the vector so that it sums to 1.0 again
+        total_prob = filtered_probs.sum()
+        if total_prob > 0:
+            filtered_probs = filtered_probs / total_prob
+
+        return filtered_probs
 
 
 class NNDriver(GENRITADriver):
@@ -429,18 +459,39 @@ class NNDriver(GENRITADriver):
 
     def classify(
         self, text: str, allowed_senses: set = None, allowed_ages: set = None
-    ) -> dict:
-        sense_probs, age_probs = self._predict_with_probabilities(
+    ) -> tuple[dict, dict, np.ndarray, np.ndarray]:
+        """
+        Processes text and returns final predictions and filtered raw probability vectors.
+        """
+        # Get raw probabilities as torch tensors
+        sense_probs_tensor, age_probs_tensor = self._predict_with_probabilities(
             DataProcessor._clean_text(text, to_lower=True)
         )
-        sense_pred = self._get_best_allowed_prediction(
-            sense_probs, SENSE_ID_TO_NAME, allowed_senses
+
+        # Convert tensors to NumPy arrays
+        sense_probs_np = sense_probs_tensor.cpu().numpy()
+        age_probs_np = age_probs_tensor.cpu().numpy()
+
+        # --- NEW: Apply filtering to raw probabilities ---
+        # Note: sense neutral_id=0, age neutral_id=1
+        sense_probs_filtered_np = self._apply_allowed_ids_filter(
+            sense_probs_np, allowed_senses, always_allowed_id=0
         )
-        age_pred = self._get_best_allowed_prediction(
-            age_probs, AGE_ID_TO_NAME, allowed_ages
+        age_probs_filtered_np = self._apply_allowed_ids_filter(
+            age_probs_np, allowed_ages, always_allowed_id=1
         )
 
-        return {"sense_prediction": sense_pred, "age_prediction": age_pred}
+        # Get the best predictions using the ORIGINAL (unfiltered) probs for the argmax part
+        # The _get_best_allowed_prediction itself contains the filtering logic for the final choice.
+        sense_pred = self._get_best_allowed_prediction(
+            sense_probs_tensor, SENSE_ID_TO_NAME, allowed_senses
+        )
+        age_pred = self._get_best_allowed_prediction(
+            age_probs_tensor, AGE_ID_TO_NAME, allowed_ages
+        )
+
+        # Return the final predictions AND the FILTERED raw probabilities
+        return sense_pred, age_pred, sense_probs_filtered_np, age_probs_filtered_np
 
 
 class LLMDriver(GENRITADriver):
@@ -468,26 +519,6 @@ class LLMDriver(GENRITADriver):
                 f"Failed to connect to Ollama. Is the Ollama service running? Error: {e}"
             )
             raise
-
-    # def _call_llm(self, prompt: str) -> dict:
-    #     """
-    #     Sends a prompt to the Ollama model and safely evaluates the Python dict-like string response.
-    #     """
-    #     try:
-    #         response = self.client.generate(model=self.model_name, prompt=prompt)
-    #         parsed_dict = self.response_cleaner(response)
-    #         # response_text = response['response'].strip()
-    #         # parsed_dict = self._parse_llm_response(response_text)
-    #
-    #         if not isinstance(parsed_dict, dict):
-    #             logging.warning(f"Parsed output is not a dictionary. Type: {type(parsed_dict)}. Output: {parsed_dict}")
-    #             return {}
-    #
-    #         return parsed_dict
-    #
-    #     except Exception as e:
-    #         logging.error(f"An error occurred while calling the LLM: {e}")
-    #         return {}
 
     def _call_llm(self, prompt: str) -> dict:
         """
@@ -680,28 +711,77 @@ class LLMDriver(GENRITADriver):
             "confidence": confidence,
         }
 
+    def _convert_probs_dict_to_array(
+        self, probs_dict: dict, class_map: dict
+    ) -> np.ndarray:
+        """
+        A new helper method to convert a dictionary of probabilities from the LLM
+        into a fixed-order NumPy array based on the class map.
+        """
+        num_classes = len(class_map)
+        # Create a zero-filled array
+        probs_array = np.zeros(num_classes, dtype=np.float32)
+
+        if not probs_dict:
+            return probs_array
+
+        # Fill the array at the correct indices
+        for class_name, probability in probs_dict.items():
+            if class_name in class_map:
+                class_id = class_map[class_name]
+                probs_array[class_id] = probability
+            else:
+                logging.warning(
+                    f"LLM returned unknown class name '{class_name}', ignoring."
+                )
+
+        # Normalize the array to ensure the sum is 1.0 in case of rounding errors from LLM
+        if probs_array.sum() > 0:
+            probs_array /= probs_array.sum()
+
+        return probs_array
+
     def classify(
         self, text: str, allowed_senses: set = None, allowed_ages: set = None
-    ) -> dict:
-        # 1. Classify Age
+    ) -> tuple[dict, dict, np.ndarray, np.ndarray]:
+        """
+        Processes text using the LLM and returns final predictions and filtered raw probability vectors.
+        """
+        # 1. Get probability dictionaries from the LLM
         age_prompt = AGE_PROMPT_TEMPLATE.format(
             text_content=json.dumps(DataProcessor._clean_text(text, to_lower=False))[
                 1:-1
             ]
         )
         age_preds_dict = self._call_llm(age_prompt)
+        sense_prompt = SENSE_PROMPT_TEMPLATE.format(text_content=json.dumps(text)[1:-1])
+        sense_preds_dict = self._call_llm(sense_prompt)
+
+        # 2. Get the best (argmax) predictions from the dictionaries (this already handles filtering for the single choice)
         age_pred = self._get_best_prediction_from_llm_output(
             age_preds_dict, AGE_CLASSES, AGE_ID_TO_NAME, allowed_ages
         )
-
-        # 2. Classify Sense
-        sense_prompt = SENSE_PROMPT_TEMPLATE.format(text_content=json.dumps(text)[1:-1])
-        sense_preds_dict = self._call_llm(sense_prompt)
         sense_pred = self._get_best_prediction_from_llm_output(
             sense_preds_dict, SENSE_CLASSES, SENSE_ID_TO_NAME, allowed_senses
         )
 
-        return {"sense_prediction": sense_pred, "age_prediction": age_pred}
+        # 3. Convert dictionaries to raw NumPy arrays
+        age_probs_np = self._convert_probs_dict_to_array(age_preds_dict, AGE_CLASSES)
+        sense_probs_np = self._convert_probs_dict_to_array(
+            sense_preds_dict, SENSE_CLASSES
+        )
+
+        # --- NEW: Apply filtering to raw probabilities ---
+        # Note: sense neutral_id=0, age neutral_id=1
+        sense_probs_filtered_np = self._apply_allowed_ids_filter(
+            sense_probs_np, allowed_senses, always_allowed_id=0
+        )
+        age_probs_filtered_np = self._apply_allowed_ids_filter(
+            age_probs_np, allowed_ages, always_allowed_id=1
+        )
+
+        # 4. Return the final predictions AND the FILTERED raw probabilities
+        return sense_pred, age_pred, sense_probs_filtered_np, age_probs_filtered_np
 
 
 TEST_CASES = [
@@ -1323,76 +1403,6 @@ TEST_CASES = [
         },
     },
 ]
-#
-# def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
-#     """
-#     Evaluates a given classifier driver against a set of test cases.
-#
-#     Args:
-#         driver (GENRITADriver): An instance of a classifier driver (NNDriver or LLMDriver).
-#         test_cases (list): A list of test case dictionaries.
-#
-#     Returns:
-#         dict: A dictionary containing performance metrics (accuracies, confusion matrices, reports).
-#     """
-#     logging.info(f"Starting evaluation for {type(driver).__name__}...")
-#
-#     y_true_sense, y_pred_sense = [], []
-#     y_true_age, y_pred_age = [], []
-#
-#     for i, case in enumerate(test_cases):
-#         text = case.get("text")
-#         true_sense_id = case.get("sense_prediction", {}).get("class_id")
-#         true_age_id = case.get("age_prediction", {}).get("class_id")
-#
-#         if text is None or true_sense_id is None or true_age_id is None:
-#             logging.warning(f"Skipping malformed test case #{i}: {case}")
-#             continue
-#
-#         try:
-#             # Get predictions from the driver
-#             predictions = driver.classify(text)
-#             pred_sense_id = predictions.get("sense_prediction", {}).get("class_id", -1)
-#             pred_age_id = predictions.get("age_prediction", {}).get("class_id", -1)
-#
-#             # Append true and predicted labels for metrics calculation
-#             y_true_sense.append(true_sense_id)
-#             y_pred_sense.append(pred_sense_id)
-#             y_true_age.append(true_age_id)
-#             y_pred_age.append(pred_age_id)
-#
-#             logging.info(f"Processed case {i+1}/{len(test_cases)}")
-#
-#         except Exception as e:
-#             logging.error(f"Failed to classify text for case #{i}. Error: {e}")
-#             # Append -1 to indicate failure for this case
-#             y_pred_sense.append(-1)
-#             y_pred_age.append(-1)
-#             y_true_sense.append(true_sense_id)
-#             y_true_age.append(true_age_id)
-#
-#
-#     # --- Calculate Metrics ---
-#     # Note: We use the labels present in the data for reports
-#     unique_sense_labels = sorted(list(set(y_true_sense)))
-#     unique_age_labels = sorted(list(set(y_true_age)))
-#
-#     sense_class_names = [SENSE_ID_TO_NAME.get(i, "Unknown") for i in unique_sense_labels]
-#     age_class_names = [AGE_ID_TO_NAME.get(i, "Unknown") for i in unique_age_labels]
-#
-#     results = {
-#         "sense_accuracy": accuracy_score(y_true_sense, y_pred_sense),
-#         "age_accuracy": accuracy_score(y_true_age, y_pred_age),
-#         "sense_confusion_matrix": confusion_matrix(y_true_sense, y_pred_sense, labels=unique_sense_labels),
-#         "age_confusion_matrix": confusion_matrix(y_true_age, y_pred_age, labels=unique_age_labels),
-#         "sense_classification_report": classification_report(y_true_sense, y_pred_sense, target_names=sense_class_names, zero_division=0),
-#         "age_classification_report": classification_report(y_true_age, y_pred_age, target_names=age_class_names, zero_division=0),
-#         "sense_class_names": sense_class_names,
-#         "age_class_names": age_class_names
-#     }
-#     logging.info("Evaluation complete.")
-#     return results
-#
 
 
 def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:

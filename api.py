@@ -232,9 +232,4 @@ async def download_job_result(job_id: str):
 
 
 # To run this application:
-# 1. Make sure you have fastapi, uvicorn, and redis-py installed:
-#    pip install "fastapi[all]" redis
-# 2. Make sure you have a Redis server running.
-# 3. Save the code as `api.py`.
-# 4. Run the server from your terminal:
 #    uvicorn api:app --reload

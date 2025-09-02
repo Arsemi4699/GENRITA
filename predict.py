@@ -42,7 +42,7 @@ def predict_text(checkpoint_path: str, text: str):
     prediction = trained_model.predict(
         text, sense_id_map=SENSE_ID_TO_NAME, age_id_map=AGE_ID_TO_NAME
     )
-
+    print(SENSE_ID_TO_NAME)
     print("\n--- Prediction Result ---")
     # Use json.dumps for pretty printing the dictionary
     print(json.dumps(prediction, indent=4))
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        required=True,
+        default="./checkpoints/best-model.ckpt",
         help="Path to the trained model .ckpt file.",
     )
     parser.add_argument(
