@@ -513,7 +513,6 @@ class ExpertInstanceGenerator(ROASTDriver):
             question=question,
         )
 
-        # Combine all parts into the final prompt
         return f"{SYSTEM_BEHAVIOR_PROMPT}{FEW_SHOT_EXAMPLES_PROMPT}{problem_part}"
 
     def _self_correct_output(self, messy_output: str) -> str:

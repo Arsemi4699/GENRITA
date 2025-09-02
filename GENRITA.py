@@ -78,6 +78,7 @@ def extract_json_objects(text):
     return results
 
 
+# --- CLASSES ---
 SENSE_CLASSES = {
     "Normal and neutral": 0,
     "Love and romantic": 1,
@@ -100,8 +101,8 @@ AGE_CLASSES = {
 SENSE_ID_TO_NAME = {v: k for k, v in SENSE_CLASSES.items()}
 AGE_ID_TO_NAME = {v: k for k, v in AGE_CLASSES.items()}
 
-# --- LLM Prompts ---
 
+# --- LLM Prompts ---
 AGE_PROMPT_TEMPLATE = """
 # System:
 **Role**: You are an `age/temporal-period` classifier model.
@@ -316,9 +317,8 @@ Your entire output must be **ONLY** the JSON object, structured like this:
 }}
 """
 
+
 # --- classifiers ---
-
-
 class GENRITADriver(ABC):
     """
     Abstract Base Class for a classifier. It defines the interface that the main
@@ -784,6 +784,7 @@ class LLMDriver(GENRITADriver):
         return sense_pred, age_pred, sense_probs_filtered_np, age_probs_filtered_np
 
 
+# --- casual test cases for GENRITA drivers
 TEST_CASES = [
     {
         "text": "The market square buzzed with a low hum of conversation. Merchants hawked their wares from colourful stalls, their voices a chaotic symphony. Children chased pigeons across the cobblestones, their laughter echoing between the tall, narrow houses. A woman haggled over the price of bread, her expression firm but fair. The air smelled of fresh-baked goods, spices, and the faint scent of rain on stone. It was a typical afternoon, unremarkable in its routine, a slice of everyday life unfolding in a town that had seen countless such days pass by. The gentle rhythm of commerce and community was the town's steady, comforting heartbeat, a simple existence without grand drama.",
@@ -1405,6 +1406,7 @@ TEST_CASES = [
 ]
 
 
+# --- evaluation and plot
 def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
     """
     Evaluates a given classifier driver against a set of test cases.
@@ -1425,8 +1427,8 @@ def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
 
         try:
             predictions = driver.classify(text)
-            pred_sense_id = predictions.get("sense_prediction", {}).get("class_id", -1)
-            pred_age_id = predictions.get("age_prediction", {}).get("class_id", -1)
+            pred_sense_id = predictions[0].get("class_id", -1)
+            pred_age_id = predictions[1].get("class_id", -1)
 
             y_true_sense.append(true_sense_id)
             y_pred_sense.append(pred_sense_id)
@@ -1486,7 +1488,7 @@ def evaluate_classifier(driver: GENRITADriver, test_cases: list) -> dict:
     return results
 
 
-def plot_performance(results: dict, driver_name: str):
+def plot_performance(results: dict, driver_name: str, save=False):
     """
     Prints reports and plots confusion matrices for the evaluation results.
 
@@ -1545,18 +1547,20 @@ def plot_performance(results: dict, driver_name: str):
     plt.setp(axes[1].get_yticklabels(), rotation=0)
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig(
-        f"./genrita_bench/Overall GENRITA {driver_name}.png",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    # plt.show()
+    if save:
+        plt.savefig(
+            f"./genrita_bench/Overall GENRITA {driver_name}.png",
+            dpi=300,
+            bbox_inches="tight",
+        )
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":
     NN_DRIVER_PARAMS = {"checkpoint_path": "./checkpoints/best-model.ckpt"}
     LLM_DRIVER_PARAMS = {"ollama_model_name": "phi4-mini"}
-    driver = "llm"
+    driver = "nn"
 
     try:
         if driver == "nn":

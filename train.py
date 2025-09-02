@@ -1,7 +1,7 @@
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-import argparse  # Import argparse
+import argparse
 
 from dataset import TextDataModule
 from model import RoBERTaMultiTaskClassifier
@@ -72,19 +72,16 @@ def main(args):
     )
 
     if not args.test_only:
-        # UPDATED: Use the checkpoint path from args
         print("Starting training...")
         model.roberta.train()
         trainer.fit(model, datamodule=data_module, ckpt_path=args.checkpoint_path)
 
     print("Starting testing...")
-    # Test the best model found during this run, or the one specified if training was skipped
     test_ckpt_path = "best" if not args.checkpoint_path else args.checkpoint_path
     trainer.test(model, datamodule=data_module, ckpt_path=test_ckpt_path)
 
 
 if __name__ == "__main__":
-    # NEW: Add argument parser
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--checkpoint_path",

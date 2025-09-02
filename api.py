@@ -92,7 +92,7 @@ def process_queue_worker():
                 extractor_driver_type=config.extractor_driver,
                 roast_params=roast_params,
                 processing_params=processing_params,
-                logger=logger
+                logger=logger,
             )
 
             results = pipeline.process_text_content(

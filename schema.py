@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
+
 class JobConfig(BaseModel):
     """Pydantic model for job configuration, received as a JSON string in a form field."""
 
@@ -42,4 +43,3 @@ class FullJobPayload(JobConfig):
     """Internal model that includes the text content for processing."""
 
     input_text: str
-

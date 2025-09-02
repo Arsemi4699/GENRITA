@@ -12,16 +12,16 @@ class ContextualizedPostprocessor:
     """
 
     def __init__(
-            self,
-            logger,
-            # --- Sense Parameters ---
-            sense_neutral_id: int = 0,
-            sense_centroids_path: str = "sense_centroids.npy",
-            sense_entropy_thr: float = 1.1,
-            # --- Age Parameters ---
-            age_neutral_id: int = 1,  # As per AGE_CLASSES definition
-            age_centroids_path: str = "age_centroids.npy",
-            age_entropy_thr: float = 0.5,  # Age has fewer classes, so entropy is naturally lower
+        self,
+        logger,
+        # --- Sense Parameters ---
+        sense_neutral_id: int = 0,
+        sense_centroids_path: str = "sense_centroids.npy",
+        sense_entropy_thr: float = 1.1,
+        # --- Age Parameters ---
+        age_neutral_id: int = 1,
+        age_centroids_path: str = "age_centroids.npy",
+        age_entropy_thr: float = 0.5,  # Age has fewer classes, so entropy is naturally lower
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ class ContextualizedPostprocessor:
         self.age_entropy_thr = age_entropy_thr
 
         try:
-            # Load models and centroids
             self.logger.info(f"Loading sense centroids from: {sense_centroids_path}")
             self.sense_centroids = np.load(sense_centroids_path)
 
@@ -47,7 +46,9 @@ class ContextualizedPostprocessor:
             self.embedder = SentenceTransformer(embedder_model_name, device=device)
 
         except FileNotFoundError as e:
-            self.logger.error(f"A required model file was not found: {e}. The postprocessor cannot function.")
+            self.logger.error(
+                f"A required model file was not found: {e}. The postprocessor cannot function."
+            )
             raise
 
         self.logger.info("ContextualizedPostprocessor (Multi-Task Strategy) is ready.")
@@ -55,14 +56,18 @@ class ContextualizedPostprocessor:
     def _get_ranks(self, scores_matrix: np.ndarray) -> np.ndarray:
         return np.argsort(-scores_matrix, axis=1).argsort(axis=1)
 
-    def _calculate_entropy_margin(self, probs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _calculate_entropy_margin(
+        self, probs: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         log_probs = np.log(probs + 1e-9)
         entropy = -np.sum(probs * log_probs, axis=1)
         sorted_probs = -np.sort(-probs, axis=1)
         margin = sorted_probs[:, 0] - sorted_probs[:, 1]
         return entropy, margin
 
-    def process_book(self, raw_outputs: list[dict]) -> tuple[list[int], list[int], np.ndarray, np.ndarray]:
+    def process_book(
+        self, raw_outputs: list[dict]
+    ) -> tuple[list[int], list[int], np.ndarray, np.ndarray]:
         if not raw_outputs:
             return [], [], np.array([]), np.array([])
 
@@ -80,17 +85,21 @@ class ContextualizedPostprocessor:
 
         # 1b. Get Similarity Gate's scores for both tasks
         self.logger.info(f"Embedding {n_paragraphs} paragraphs...")
-        text_embeddings = self.embedder.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+        text_embeddings = self.embedder.encode(
+            texts, convert_to_numpy=True, show_progress_bar=False
+        )
 
         # Sense Similarities
         sense_sims = np.dot(text_embeddings, self.sense_centroids.T) / (
-                    np.linalg.norm(text_embeddings, axis=1, keepdims=True) * np.linalg.norm(self.sense_centroids,
-                                                                                            axis=1).T)
+            np.linalg.norm(text_embeddings, axis=1, keepdims=True)
+            * np.linalg.norm(self.sense_centroids, axis=1).T
+        )
 
         # Age Similarities
         age_sims = np.dot(text_embeddings, self.age_centroids.T) / (
-                    np.linalg.norm(text_embeddings, axis=1, keepdims=True) * np.linalg.norm(self.age_centroids,
-                                                                                            axis=1).T)
+            np.linalg.norm(text_embeddings, axis=1, keepdims=True)
+            * np.linalg.norm(self.age_centroids, axis=1).T
+        )
 
         # --- STEP 2: Get Ranks from both models for both tasks ---
         roberta_sense_ranks = self._get_ranks(all_sense_probs)
@@ -101,9 +110,10 @@ class ContextualizedPostprocessor:
 
         final_sense_labels = []
         final_age_labels = []
-        self.logger.info("Applying confidence-weighted rank combination to each paragraph for both tasks...")
+        self.logger.info(
+            "Applying confidence-weighted rank combination to each paragraph for both tasks..."
+        )
 
-        # --- STEP 3: The Main Calculation Loop ---
         for i in range(n_paragraphs):
             # --- Process SENSE ---
             if sense_entropy[i] > self.sense_entropy_thr:
@@ -111,7 +121,9 @@ class ContextualizedPostprocessor:
             else:
                 weight_r = 1.0 + sense_margin[i]
                 weight_s = 1.0
-                rank_sum = (weight_r * roberta_sense_ranks[i]) + (weight_s * similarity_sense_ranks[i])
+                rank_sum = (weight_r * roberta_sense_ranks[i]) + (
+                    weight_s * similarity_sense_ranks[i]
+                )
                 winner = np.argmin(rank_sum)
                 final_sense_labels.append(winner)
 
@@ -121,7 +133,9 @@ class ContextualizedPostprocessor:
             else:
                 weight_r = 1.0 + age_margin[i]
                 weight_s = 1.0
-                rank_sum = (weight_r * roberta_age_ranks[i]) + (weight_s * similarity_age_ranks[i])
+                rank_sum = (weight_r * roberta_age_ranks[i]) + (
+                    weight_s * similarity_age_ranks[i]
+                )
                 winner = np.argmin(rank_sum)
                 final_age_labels.append(winner)
 

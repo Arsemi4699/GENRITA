@@ -77,7 +77,6 @@ class TextDataModule(pl.LightningDataModule):
             print(f"Error: Data file not found at {self.data_path}")
             return
 
-        # NEW: Using stratified splitting to preserve class distribution across sets.
         # We stratify by 'sense_class_id' as it has more classes.
         stratify_col = "sense_class_id"
 

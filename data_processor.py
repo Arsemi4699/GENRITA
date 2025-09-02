@@ -366,15 +366,12 @@ if __name__ == "__main__":
         "technology modern age": 2,
     }
 
-    # --- IMPORTANT ---
-    # Please update the INPUT_CSV path to your actual data file.
-    # For example: INPUT_CSV = './data/raw_dataset.csv'
     INPUT_CSV = "data/dataset3.csv"
     OUTPUT_CSV = "data/cleaned_data3.csv"
 
     # Initialize and run the processor
     processor = DataProcessor(sense_classes=SENSE_CLASSES, age_classes=AGE_CLASSES)
-    # Make sure to replace the path in the line below with your actual file path
+    
     cleaned_df = processor.run_pipeline(
         input_filepath=INPUT_CSV, output_filepath=OUTPUT_CSV
     )

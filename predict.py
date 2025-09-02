@@ -3,7 +3,6 @@ from model import RoBERTaMultiTaskClassifier
 import json
 
 # Define the class mappings to decode predictions
-# You should get these from your initial data processing script
 SENSE_CLASSES = {
     "Normal and neutral": 0,
     "Love and romantic": 1,
@@ -22,7 +21,7 @@ AGE_CLASSES = {
     "neutral and not special age (non-ancient, non technology)": 1,
     "technology modern age": 2,
 }
-# Create reverse maps for decoding
+
 SENSE_ID_TO_NAME = {v: k for k, v in SENSE_CLASSES.items()}
 AGE_ID_TO_NAME = {v: k for k, v in AGE_CLASSES.items()}
 
@@ -32,11 +31,11 @@ def predict_text(checkpoint_path: str, text: str):
     Loads a model from a checkpoint and predicts on a given text.
     """
     print(f"Loading model from checkpoint: {checkpoint_path}")
-    # Load the model from the checkpoint
+    
     trained_model = RoBERTaMultiTaskClassifier.load_from_checkpoint(
         checkpoint_path=checkpoint_path
     )
-    trained_model.freeze()  # Freeze weights for faster inference
+    trained_model.freeze()
 
     print(f"Predicting on text: '{text}'")
     prediction = trained_model.predict(
@@ -44,7 +43,6 @@ def predict_text(checkpoint_path: str, text: str):
     )
     print(SENSE_ID_TO_NAME)
     print("\n--- Prediction Result ---")
-    # Use json.dumps for pretty printing the dictionary
     print(json.dumps(prediction, indent=4))
     print("-------------------------")
 

@@ -7,6 +7,6 @@
   "llm_ollama_model": "phi4-mini",
   "roast_model_path": "phi4-mini",
   "target_abstracts": {
-    "Sir Davos" : "Sir Davos is a master of the blade, moving with a grace and precision that makes every strike appear effortless yet devastating. His reflexes are unmatched, able to read an opponent’s intentions before they even move, turning their strength into their downfall. Years of discipline and training have given him not only skill, but also wisdom in combat—he knows when to strike with ferocity and when to hold back with patience. His reputation as the First Sword of Braavos is not just for his unmatched technique, but also for his honor, confidence, and unshakable composure, even in the face of overwhelming odds. To watch him fight is to witness the art of swordsmanship perfected."
+    "Sir Davos": "Sir Davos is a master of the blade, moving with a grace and precision that makes every strike appear effortless yet devastating. His reflexes are unmatched, able to read an opponent’s intentions before they even move, turning their strength into their downfall. Years of discipline and training have given him not only skill, but also wisdom in combat—he knows when to strike with ferocity and when to hold back with patience. His reputation as the First Sword of Braavos is not just for his unmatched technique, but also for his honor, confidence, and unshakable composure, even in the face of overwhelming odds. To watch him fight is to witness the art of swordsmanship perfected."
   }
 }

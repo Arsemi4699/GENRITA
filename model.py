@@ -183,12 +183,6 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
         # 4. Get probabilities and predictions
         sense_probs = torch.softmax(sense_logits, dim=1)
         age_probs = torch.softmax(age_logits, dim=1)
-        # print("---")
-        # print("Sense Ps:")
-        # print(sense_probs)
-        # print("Age Ps:")
-        # print(age_probs)
-        # print("---")
         sense_pred_id = torch.argmax(sense_probs, dim=1).item()
         age_pred_id = torch.argmax(age_probs, dim=1).item()
 

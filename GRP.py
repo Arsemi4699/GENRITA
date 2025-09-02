@@ -10,7 +10,7 @@ from data_processor import DataProcessor
 from thefuzz import fuzz
 from post_processor import ContextualizedPostprocessor
 
-# --- GRPipeline Class (Adapted for API) ---
+
 class GRPipeline:
     """
     Processes text documents, integrating configurable classifiers and extractors,
@@ -74,7 +74,7 @@ class GRPipeline:
             sense_entropy_thr=1.1,
             age_neutral_id=1,
             age_centroids_path="centroids_embeds/age_centroids.npy",
-            age_entropy_thr=0.5
+            age_entropy_thr=0.5,
         )
 
         self.canonical_entity_bank = {}
@@ -82,10 +82,10 @@ class GRPipeline:
 
     @staticmethod
     def _chunk_text(
-            text: str,
-            target_words: int = 128,
-            min_paragraph_words: int = 48,
-            min_block_words: int = 30,
+        text: str,
+        target_words: int = 128,
+        min_paragraph_words: int = 48,
+        min_block_words: int = 30,
     ) -> list[str]:
         """
         Split text into semantically meaningful chunks.
@@ -115,7 +115,7 @@ class GRPipeline:
             for paragraph in paragraphs:
                 para_word_count = len(paragraph.split())
 
-                # Large paragraph → standalone chunk
+                # Large paragraph -> standalone chunk
                 if para_word_count >= min_paragraph_words:
                     if current_chunk_sentences:
                         chunks.append(" ".join(current_chunk_sentences))
@@ -133,7 +133,7 @@ class GRPipeline:
                         chunks.append(" ".join(current_chunk_sentences))
                         current_chunk_sentences = []
 
-            # At the end of a "hard boundary" block → flush current sentences
+            # At the end of a "hard boundary" block -> flush current sentences
             if treat_as_strict_boundary and current_chunk_sentences:
                 chunks.append(" ".join(current_chunk_sentences))
                 current_chunk_sentences = []
@@ -171,6 +171,7 @@ class GRPipeline:
                 if combined_score > highest_score:
                     highest_score = combined_score
                     best_match_group_id = group_id
+
             SIMILARITY_THRESHOLD = 60
             if highest_score >= SIMILARITY_THRESHOLD:
                 entity_to_group_id[i] = best_match_group_id
@@ -210,22 +211,27 @@ class GRPipeline:
         # --- Phase 1: Data Collection for Both Tasks ---
         self.logger.info("Phase 1: Collecting raw model outputs for Sense and Age...")
         raw_outputs = []
-        for text_paragraph in tqdm(paragraphs, desc=f"Phase 1/3: Analyzing paragraphs for '{title}'"):
-            # The classify method returns final predictions and raw probabilities for both tasks
+        for text_paragraph in tqdm(
+            paragraphs, desc=f"Phase 1/3: Analyzing paragraphs for '{title}'"
+        ):
             _, _, sense_probs_np, age_probs_np = self.classifier.classify(
                 text_paragraph, self.allowed_sense_ids, self.allowed_age_ids
             )
             # We store the raw probabilities needed for the multi-task post-processor
-            raw_outputs.append({
-                "text": text_paragraph,
-                "sense_probs": sense_probs_np,
-                "age_probs": age_probs_np,  # Now storing raw age probabilities as well
-                "raw_entities": []
-            })
+            raw_outputs.append(
+                {
+                    "text": text_paragraph,
+                    "sense_probs": sense_probs_np,
+                    "age_probs": age_probs_np,
+                    "raw_entities": [],
+                }
+            )
 
-        # --- Phase 1b: Entity Extraction (Preserved from your original code) ---
+        # --- Phase 1b: Entity Extraction ---
         self.logger.info("Phase 1b: Extracting entities and building canonical bank...")
-        for output in tqdm(raw_outputs, desc=f"Phase 2/3: Extracting entities for '{title}'"):
+        for output in tqdm(
+            raw_outputs, desc=f"Phase 2/3: Extracting entities for '{title}'"
+        ):
             text_paragraph = output["text"]
             raw_entities = []
             if self.extractor and self.target_abstracts:
@@ -235,44 +241,51 @@ class GRPipeline:
                             text_paragraph, abstract.strip(), explanation.strip()
                         )
                         for span, score, start, end in instances:
-                            raw_entities.append({
-                                "type": abstract,
-                                "sample": span,
-                                "start_pos": start,
-                                "end_pos": end,
-                                "score": score,
-                            })
+                            raw_entities.append(
+                                {
+                                    "type": abstract,
+                                    "sample": span,
+                                    "start_pos": start,
+                                    "end_pos": end,
+                                    "score": score,
+                                }
+                            )
                     except Exception as e:
-                        self.logger.warning(f"ROAST failed for abstract '{abstract}'. Error: {e}")
+                        self.logger.warning(
+                            f"ROAST failed for abstract '{abstract}'. Error: {e}"
+                        )
             output["raw_entities"] = raw_entities
             self._unify_entities(raw_entities)
 
         # --- Phase 2: Multi-Task Post-Processing ---
         self.logger.info("Phase 2: Applying multi-task post-processing pipeline...")
         # The post-processor now returns final IDs and probabilities for both tasks
-        final_sense_ids, final_age_ids, final_sense_probs, final_age_probs = self.postprocessor.process_book(
-            raw_outputs)
+        final_sense_ids, final_age_ids, final_sense_probs, final_age_probs = (
+            self.postprocessor.process_book(raw_outputs)
+        )
 
         # --- Phase 3: Final Assembly ---
         self.logger.info("Phase 3: Assembling final results...")
         final_results = []
-        for i, result in enumerate(tqdm(raw_outputs, desc=f"Phase 3/3: Assembling final results for '{title}'")):
+        for i, result in enumerate(
+            tqdm(raw_outputs, desc=f"Phase 3/3: Assembling final results for '{title}'")
+        ):
             # 1. Assemble SENSE prediction using post-processed results
             final_sense_id = final_sense_ids[i]
             sense_confidence = final_sense_probs[i, final_sense_id]
             sense_pred = {
                 "class_name": SENSE_ID_TO_NAME.get(final_sense_id, "Unknown"),
                 "class_id": int(final_sense_id),
-                "confidence": float(sense_confidence)
+                "confidence": float(sense_confidence),
             }
 
-            # 2. Assemble AGE prediction using post-processed results (old fallback logic is now removed)
+            # 2. Assemble AGE prediction using post-processed results
             final_age_id = final_age_ids[i]
             age_confidence = final_age_probs[i, final_age_id]
             age_pred = {
                 "class_name": AGE_ID_TO_NAME.get(final_age_id, "Unknown"),
                 "class_id": int(final_age_id),
-                "confidence": float(age_confidence)
+                "confidence": float(age_confidence),
             }
 
             # 3. Unify entities for the final output
@@ -286,7 +299,9 @@ class GRPipeline:
             }
             final_results.append(final_paragraph_result)
 
-        final_unified_instances = {k: list(v.values()) for k, v in self.canonical_entity_bank.items()}
+        final_unified_instances = {
+            k: list(v.values()) for k, v in self.canonical_entity_bank.items()
+        }
 
         return {
             "title": title,
