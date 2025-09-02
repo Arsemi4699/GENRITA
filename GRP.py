@@ -8,7 +8,7 @@ import gc
 import torch
 from data_processor import DataProcessor
 from thefuzz import fuzz
-from post_processor import ContextualizedPostprocessor
+from post_processor import ClassificationPostRefinement
 
 
 class GRPipeline:
@@ -67,7 +67,7 @@ class GRPipeline:
         )
 
         self.run_postprocessor = True
-        self.postprocessor = ContextualizedPostprocessor(
+        self.postprocessor = ClassificationPostRefinement(
             logger=self.logger,
             sense_neutral_id=0,
             sense_centroids_path="centroids_embeds/sense_centroids.npy",

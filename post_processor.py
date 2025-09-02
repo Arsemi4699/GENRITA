@@ -5,7 +5,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 
-class ContextualizedPostprocessor:
+class ClassificationPostRefinement:
     """
     Final multi-task architecture: Implements a Confidence-Weighted Rank Combination
     for BOTH sense and age classifications.
@@ -51,7 +51,7 @@ class ContextualizedPostprocessor:
             )
             raise
 
-        self.logger.info("ContextualizedPostprocessor (Multi-Task Strategy) is ready.")
+        self.logger.info("ClassificationPostRefinement (Multi-Task Strategy) is ready.")
 
     def _get_ranks(self, scores_matrix: np.ndarray) -> np.ndarray:
         return np.argsort(-scores_matrix, axis=1).argsort(axis=1)
