@@ -1,0 +1,206 @@
+{
+    "title": "demo",
+    "paragraphs": [
+        {
+            "text": "Inside the humming corridors of the orbital station Epsilon-9, Daniel sat at his console, eyes fixed on streams of numbers flowing across the holographic screens. His role as systems controller was far from glamorous—monitoring computer networks, rerouting data packets between research satellites, and ensuring the ship’s artificial intelligence responded smoothly to commands. For him, space was not about adventure but employment, another shift in a career built on steady focus. With practiced fingers, he adjusted a line of code, checked diagnostics, and leaned back in his chair, thinking only of returning home to his daughter after the shift ended.",
+            "sense_prediction": {
+                "class_name": "Normal and neutral",
+                "class_id": 0,
+                "confidence": 0.963325560092926
+            },
+            "age_prediction": {
+                "class_name": "technology modern age",
+                "class_id": 2,
+                "confidence": 0.9981110095977783
+            },
+            "entities": []
+        },
+        {
+            "text": "The alarms shattered the calm. Crimson lights flashed as the console displayed hostile interceptors breaching defense perimeters. Raiders, known for ruthless ambushes, unleashed torrents of plasma fire and razor-like laser beams against the station’s hull. Daniel felt the entire craft tremble under relentless assault. He scrambled for the emergency override while automated turrets discharged in return. Gunfire rattled through metallic corridors, echoing like thunder in a steel canyon. Then, amid the chaos, a sealed chamber ruptured—a prototype time capsule covered in bronze guard. Energy surged outward in a violent pulse, wrapping Daniel in brilliance before darkness consumed him, forcing his consciousness into sudden, unnatural sleep.",
+            "sense_prediction": {
+                "class_name": "War and combat",
+                "class_id": 2,
+                "confidence": 0.9961358904838562
+            },
+            "age_prediction": {
+                "class_name": "technology modern age",
+                "class_id": 2,
+                "confidence": 0.9993201494216919
+            },
+            "entities": [
+                {
+                    "type": "time capsule",
+                    "sample": "prototype time capsule",
+                    "start_pos": 540,
+                    "end_pos": 562,
+                    "score": 1.0
+                }
+            ]
+        },
+        {
+            "text": "He awoke to the hiss of waves washing over his cheek. Grainy sand clung to his face, and saltwater stung his lips. Confused, Daniel staggered upright, staring at a boundless horizon where blue water stretched into infinity. The sky was soft gray, the tide rising and falling with a rhythm older than memory. He turned in every direction, yet no vessel or landmark appeared, only the vast sweep of shoreline and the endless push of waves. Disoriented and weary, he began walking along the beach, every step marked by questions of where he was, when he was, and why the sea had claimed him.",
+            "sense_prediction": {
+                "class_name": "Sea and tides",
+                "class_id": 9,
+                "confidence": 0.9566144943237305
+            },
+            "age_prediction": {
+                "class_name": "neutral and not special age (non-ancient, non technology)",
+                "class_id": 1,
+                "confidence": 0.9896607398986816
+            },
+            "entities": []
+        },
+        {
+            "text": "He saw a gate in far away. At the city’s carved gate he entered a maze of narrow lanes crowded with people. Stalls hugged the stone-paved streets, heaped with amphorae, woven baskets, and bundles of dried herbs; merchants called prices and buyers haggled in measured tones. Potters turned clay at open kilns while blacksmiths hammered bronze on simple anvils, and cobblers stitched leather with hand-forged needles. Linen-clad watchmen paced atop sun-darkened walls as oxen-drawn carts threaded the thoroughfares. Smoke from hearths and the murmur of bargaining filled the air.",
+            "sense_prediction": {
+                "class_name": "City and Crowd",
+                "class_id": 6,
+                "confidence": 0.9463067650794983
+            },
+            "age_prediction": {
+                "class_name": "ancient and old age",
+                "class_id": 0,
+                "confidence": 0.9925562739372253
+            },
+            "entities": []
+        },
+        {
+            "text": "A thunderous roar shattered the clamor of the stone marketplace. Villagers dropped clay jars and scattered across the dusty square, sandals slapping against uneven cobblestones. From the sky descended a beast of legend—a lion’s body covered in red and gold feathers, its wings vast as sails, talons gleaming like bronze. Elders cried out the word, “Griffin!” as incense smoke curled from temple steps nearby. Upon the creature’s back sat a robed magus, his staff carved from dark wood, cap embroidered with golden runes.",
+            "sense_prediction": {
+                "class_name": "Fantasy and mythology",
+                "class_id": 3,
+                "confidence": 0.9818873405456543
+            },
+            "age_prediction": {
+                "class_name": "ancient and old age",
+                "class_id": 0,
+                "confidence": 0.9954171180725098
+            },
+            "entities": []
+        },
+        {
+            "text": "Shaken, Daniel drifted back into the marketplace. Stalls overflowed with grains, spices, and clay vessels, their colors vivid beneath the afternoon sun. A merchant, face weathered yet bright, called out about fragrant peppercorns displayed in small pouches. Seizing the chance, Daniel approached, desperate for information. “Where am I? What is this place?” he asked in urgent English. The merchant tilted his head, replying in a tongue utterly foreign, gestures warm but incomprehensible. Their words crossed without meeting. Frustration pressed on Daniel’s chest.",
+            "sense_prediction": {
+                "class_name": "Normal and neutral",
+                "class_id": 0,
+                "confidence": 0.18522828817367554
+            },
+            "age_prediction": {
+                "class_name": "neutral and not special age (non-ancient, non technology)",
+                "class_id": 1,
+                "confidence": 0.9758955836296082
+            },
+            "entities": []
+        },
+        {
+            "text": "Hungry, Daniel entered a dimly lit inn, lit by earthen lamps and the smoky glow of a fire. Peasants in rough woolen clothes drank wine from bronze goblets, their laughter echoing in the darkened beams of the fire. A plump chicken sat on a spit above the coals, its skin crackling and its juices dripping into the flames. The smell of perfume stung his empty stomach. He placed two papers on the counter and pointed to them with a trembling hand. The innkeeper took the papers, threw them on the ground, and cursed him loudly as the crowd jeered. His wife, pityingly, squeezed a piece of stale bread into her palm to send him away. Daniel sank down onto the cold steps outside, tasting the ashes where he longed for meat. His hope turned to silence, but the silence didn't last long with his stomach rumbling.",
+            "sense_prediction": {
+                "class_name": "Normal and neutral",
+                "class_id": 0,
+                "confidence": 0.35412541031837463
+            },
+            "age_prediction": {
+                "class_name": "ancient and old age",
+                "class_id": 0,
+                "confidence": 0.9764025211334229
+            },
+            "entities": []
+        },
+        {
+            "text": "Seeking solitude, Daniel wandered beyond the paths and into a vast forest. The canopy stretched high above him, oak and pine interlacing to weave shifting patterns of light and shadow. Damp earth yielded under his boots, and the air carried the scent of moss, bark, and the faint sweetness of wild berries -the only food he could find. Ferns brushed his legs as he pushed through undergrowth alive with the crackle of insects and the distant call of owls. The silence here was immense, broken only by branches creaking in the wind. Yet even among this living maze, his thoughts circled back to the capsule, it most be, it most be the thing that draw him here, that strange capsule. Somewhere, it must still exist—the only thread linking him to his own world, the only way he might return.",
+            "sense_prediction": {
+                "class_name": "Forest and tress",
+                "class_id": 10,
+                "confidence": 0.898684024810791
+            },
+            "age_prediction": {
+                "class_name": "neutral and not special age (non-ancient, non technology)",
+                "class_id": 1,
+                "confidence": 0.967521071434021
+            },
+            "entities": [
+                {
+                    "type": "time capsule",
+                    "sample": "the only thread linking him to his own world",
+                    "start_pos": 713,
+                    "end_pos": 757,
+                    "score": 1.0
+                },
+                {
+                    "type": "time capsule",
+                    "sample": "prototype time capsule",
+                    "start_pos": 598,
+                    "end_pos": 605,
+                    "score": 1.0
+                }
+            ]
+        },
+        {
+            "text": "By dawn, the forest gave way to arid plains and then to dunes rising like golden waves against the horizon. Heat shimmered in the distance, distorting shapes into mirages. Sand crunched beneath Daniel’s sandals as he pressed forward under the oppressive sun. The landscape was stark yet awe-inspiring, endless ridges sculpted by the wind into flowing patterns. In this desolate environment, silence held dominion, interrupted only by the whisper of shifting grains. Though weary, Daniel marveled at how alive the desert seemed, its harsh beauty ancient and eternal, as if carrying secrets written long before his own existence began.",
+            "sense_prediction": {
+                "class_name": "Desert and dunes",
+                "class_id": 8,
+                "confidence": 0.9943583607673645
+            },
+            "age_prediction": {
+                "class_name": "neutral and not special age (non-ancient, non technology)",
+                "class_id": 1,
+                "confidence": 0.8606013059616089
+            },
+            "entities": []
+        },
+        {
+            "text": "At last, Daniel reached a ruin that bore the weight of centuries. Fallen marble columns lay cracked across the ground, their carved patterns worn by wind and rain. Shattered statues of forgotten gods stared with eyeless faces, their once-proud forms reduced to fragments among weeds. The remains of an altar, blackened by fire, marked the heart of what had been a temple of worship. An elder in rough linen robes traced the faint inscriptions with trembling fingers, his voice heavy with grief as he spoke of a war that burned the sanctuary and scattered its people. The air clung with sorrow, as if the stones themselves remembered the cries of the slain.",
+            "sense_prediction": {
+                "class_name": "Drama and tragedy",
+                "class_id": 5,
+                "confidence": 0.8064854145050049
+            },
+            "age_prediction": {
+                "class_name": "ancient and old age",
+                "class_id": 0,
+                "confidence": 0.98542320728302
+            },
+            "entities": []
+        },
+        {
+            "text": "Daniel lingered among the weathered stones of the ruin when faint voices carried across the dry wind. This place lay on the route of desert caravans, where merchants drove camels laden with sacks of dried figs, salted meat, and skins of water to endure the long crossing. Three travelers in coarse linen robes passed along the cracked path, dust clinging to their sandals after many days on the road. To his astonishment, their words were in English, though spoken with an uneven, ancient cadence. They spoke of a marvel beyond the dunes: a thing fallen from the sky, solid as rock yet gleaming like polished steel, long and curved like a monolith. Daniel approached and asked when it came. One answered, “Twenty days past.” His heart quickened—that was the very day I awoke here. It must be the capsule… the only way back.",
+            "sense_prediction": {
+                "class_name": "Desert and dunes",
+                "class_id": 8,
+                "confidence": 0.900507390499115
+            },
+            "age_prediction": {
+                "class_name": "ancient and old age",
+                "class_id": 0,
+                "confidence": 0.9928816556930542
+            },
+            "entities": [
+                {
+                    "type": "time capsule",
+                    "sample": "a thing fallen from the sky",
+                    "start_pos": 539,
+                    "end_pos": 566,
+                    "score": 1.0
+                },
+                {
+                    "type": "time capsule",
+                    "sample": "the only way back",
+                    "start_pos": 805,
+                    "end_pos": 822,
+                    "score": 1.0
+                }
+            ]
+        }
+    ],
+    "canonical_entity_bank": {
+        "time capsule": [
+            "prototype time capsule",
+            "the only thread linking him to his own world",
+            "a thing fallen from the sky",
+            "the only way back"
+        ]
+    },
+    "job_id": "b43108f0-ced2-4371-b636-7efb51dd731b"
+}

@@ -442,6 +442,16 @@ FEW_SHOT_EXAMPLES_PROMPT = """
 ---
 **example 5**:
 
+- "context": "He strode across the battlefield, gripping a weapon shaped like a crescent moon, gleaming under sunlight, whispering tales of forgotten wars. he draw his strange sword and draw it on a thief throat."
+- "abstract": "curved sword"
+- "explanation_of_abstract": "a curved sword is a bladed weapon with an arched edge, designed for swift, slicing attacks."
+- "question": "An {curved sword} {is a curved sword is a bladed weapon with an arched edge, designed for swift, slicing attacks.}. Which instances of {curved sword} are described in the passage?"
++ "answers": ["a weapon shaped like a crescent moon", "his strange sword"]
+
+
+---
+**example 6**:
+
 - "context": "At the zoo, the keeper introduced two animals: Zuri, the clever chimpanzee, and Bobo, a lazy orangutan who preferred sleeping to climbing trees."
 - "abstract": "ape"
 - "explanation_of_abstract": "is a kind of intelligent primate without a tail"
