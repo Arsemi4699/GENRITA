@@ -6,8 +6,8 @@ import ollama
 import json
 import ast
 import re
-from haystack import component, Document, Answer
-from haystack.components.readers import ExtractiveReader
+# from haystack import component, Document, Answer
+# from haystack.components.readers import ExtractiveReader
 from abc import ABC, abstractmethod
 from thefuzz import fuzz
 import matplotlib.pyplot as plt
@@ -65,333 +65,333 @@ class ROASTDriver(ABC):
         """
         pass
 
-
-@component
-class QuestionGenerator:
-    """
-    Generates a set of varied, natural-language questions to guide the
-    ExtractiveReader, improving its ability to find diverse instances.
-    """
-
-    @component.output_types(questions=List[str])
-    def run(
-        self, abstract_concept: str, explanation: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Generates questions based on the abstract concept.
-        :param abstract_concept: The concept to find instances of.
-        :param explanation: An optional explanation of the abstract concept.
-        :return: A dictionary containing a list of questions.
-        """
-        if not isinstance(abstract_concept, str) or not abstract_concept:
-            logging.warning("QuestionGenerator received an invalid abstract_concept.")
-            return {"questions": []}
-
-        # Generate a plural form for more natural-sounding questions.
-        if (
-            abstract_concept.endswith("y")
-            and len(abstract_concept) > 1
-            and abstract_concept[-2] not in "aeiou"
-        ):
-            plural_concept = f"{abstract_concept[:-1]}ies"
-        elif abstract_concept.endswith(("s", "x", "z", "ch", "sh")):
-            plural_concept = f"{abstract_concept}es"
-        else:
-            plural_concept = f"{abstract_concept}s"
-
-        # Create a context-setting prefix if an explanation is provided.
-        prefix = ""
-        if explanation:
-            prefix = f"A {abstract_concept} {explanation}. "
-
-        # A set of diverse questions to improve the model's recall.
-        questions = [
-            f"{prefix}. Which instances of {abstract_concept} are mentioned in the text?",
-            f"{prefix}. Which {plural_concept} are described in the passage?",
-            # f"{prefix}. What specific {plural_concept} are listed in the document?",
-            # f"{prefix}. Identify the names of the {plural_concept} in the text.",
-        ]
-        return {"questions": questions}
-
-
-@component
-class AnswerFilter:
-    """
-    Filters and refines a list of Haystack Answers using score normalization
-    and span containment to find the best candidate answers.
-    """
-
-    @staticmethod
-    def _is_overlapping(answer1: Answer, answer2: Answer) -> bool:
-        """
-        Checks if one answer's span is fully contained within the other.
-        This is a static method as its logic does not depend on the state
-        of an AnswerFilter instance.
-        """
-        # Ensure both answers have valid document_offset attributes to compare.
-        if not all(
-            hasattr(ans, "document_offset") and ans.document_offset
-            for ans in [answer1, answer2]
-        ):
-            return False
-        start1, end1 = answer1.document_offset.start, answer1.document_offset.end
-        start2, end2 = answer2.document_offset.start, answer2.document_offset.end
-
-        return (start1 >= start2 and end1 <= end2) or (
-            start2 >= start1 and end2 <= end1
-        )
-
-    @component.output_types(filtered_answers=List[Answer])
-    def run(self, answers: List[Answer]) -> Dict[str, Any]:
-        """
-        Filters answers using score normalization and span containment.
-        :param answers: A list of Answer objects from the reader.
-        :return: A dictionary containing the filtered list of answers.
-        """
-        # Calculate a normalized score to penalize overly long answers.
-        for ans_item in answers:
-            if ans_item.data:
-                # Add a small constant to length to avoid division by zero or log(1) issues.
-                ans_item.meta["normalized_score"] = ans_item.score / math.log(
-                    len(ans_item.data) + 1.1
-                )
-            else:
-                ans_item.meta["normalized_score"] = 0
-
-        # Sort by the new normalized score to prioritize concise, high-confidence answers.
-        sorted_answers = sorted(
-            answers, key=lambda x: x.meta.get("normalized_score", 0), reverse=True
-        )
-
-        # Filter out overlapping answers, keeping the one with the higher normalized score.
-        final_answers: List[Answer] = []
-        for candidate_answer in sorted_answers:
-            if candidate_answer.data is None:
-                continue
-            if not any(
-                self._is_overlapping(candidate_answer, kept_answer)
-                for kept_answer in final_answers
-            ):
-                final_answers.append(candidate_answer)
-        return {"filtered_answers": final_answers}
-
-
-class ExpertInstanceExtractor(ROASTDriver):
-    """
-    Orchestrates Haystack components and applies advanced heuristic filtering
-    to perform highly accurate instance extraction.
-    """
-
-    def __init__(
-        self,
-        model_name_or_path: str,
-        device: Optional[str] = None,
-        reader_top_k: int = 20,
-        score_threshold: float = 0.0,
-    ):
-        self.q_gen = QuestionGenerator()
-        self.reader = ExtractiveReader(
-            model=model_name_or_path, device=device, top_k=reader_top_k, no_answer=True
-        )
-        self.filter = AnswerFilter()
-        self.reader.warm_up()
-        self.score_threshold = score_threshold
-
-        # An expanded set of "function words" to better identify descriptive phrases.
-        self.FUNCTION_WORDS = {
-            "a",
-            "an",
-            "the",
-            "in",
-            "on",
-            "of",
-            "for",
-            "to",
-            "with",
-            "by",
-            "at",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "being",
-            "have",
-            "has",
-            "had",
-            "do",
-            "does",
-            "did",
-            "will",
-            "would",
-            "should",
-            "can",
-            "could",
-            "may",
-            "might",
-            "must",
-            "one",
-            "two",
-            "three",
-            "four",
-            "five",
-            "six",
-            "seven",
-            "eight",
-            "nine",
-            "ten",
-            "some",
-            "any",
-            "all",
-            "several",
-            "many",
-            "few",
-            "other",
-            "another",
-            "various",
-            "its",
-            "their",
-            "my",
-            "your",
-            "his",
-            "her",
-            "first",
-            "second",
-            "third",
-            "last",
-            "next",
-            "former",
-            "latter",
-            "main",
-            "largest",
-            "smallest",
-            "older",
-            "newer",
-            "red",
-            "green",
-            "blue",
-            "named",
-            "called",
-            "known",
-            "described",
-            "including",
-            "such",
-            "as",
-            "and",
-            "or",
-            "but",
-            "performance-critical",
-            "sections",
-        }
-        logging.info("ExpertInstanceExtractor components are initialized and ready.")
-
-    def _is_valid_instance(self, span_to_check: str, abstract_concept: str) -> bool:
-        """
-        A final, intelligent validation gate to ensure the answer is a clean entity.
-        :param span_to_check: The cleaned answer string.
-        :param abstract_concept: The original concept being searched for.
-        :return: True if the span is a valid instance, False otherwise.
-        """
-        words = span_to_check.lower().split()
-
-        # Rule 1: Must not be excessively long (e.g., more than 3 words).
-        if len(words) > 3:
-            return False
-
-        # Rule 2: Must not be an "echo" of the abstract concept.
-        abstract_words = set(abstract_concept.lower().split())
-        if abstract_words.issubset(set(words)):
-            return False
-
-        # Rule 3: Must contain at least one "substantive" word.
-        if not any(word not in self.FUNCTION_WORDS for word in words):
-            return False
-
-        return True
-
-    def extract(
-        self,
-        context: str,
-        abstract_concept: str,
-        explanation_of_abstract: Optional[str] = None,
-    ) -> List[Tuple[str, float, int, int]]:
-        """
-        Runs the full extraction and filtering pipeline.
-        :param context: The text to search within.
-        :param abstract_concept: The abstract concept to find instances of.
-        :param explanation_of_abstract: An optional explanation of the abstract concept.
-        :return: A list of tuples, each containing (instance, score, start_offset, end_offset).
-        """
-        if not context or not abstract_concept:
-            return []
-        docs = [Document(content=context)]
-        questions = self.q_gen.run(
-            abstract_concept=abstract_concept, explanation=explanation_of_abstract
-        )["questions"]
-
-        # Step 1: Gather all possible answers from the reader for all questions.
-        all_raw_answers: List[Answer] = []
-        for query_text in questions:
-            try:
-                reader_result = self.reader.run(query=query_text, documents=docs)
-                all_raw_answers.extend(reader_result.get("answers", []))
-            except Exception as e:
-                logging.error(f"Error running reader for question '{query_text}': {e}")
-                continue
-
-        # Step 2: Apply the score threshold early for efficiency.
-        thresholded_answers = [
-            ans for ans in all_raw_answers if ans.score >= self.score_threshold
-        ]
-
-        # Step 3: Run the initial filtering component.
-        filter_result = self.filter.run(answers=thresholded_answers)
-        candidate_answers = filter_result["filtered_answers"]
-
-        # Step 4: Add a 'is_proper' flag to metadata for ranking.
-        for ans_item in candidate_answers:
-            if ans_item.data and ans_item.data[0].isupper():
-                ans_item.meta["is_proper"] = True
-            else:
-                ans_item.meta["is_proper"] = False
-
-        # Step 5: Re-rank candidates, prioritizing proper nouns, then by original score.
-        ranked_candidates = sorted(
-            candidate_answers,
-            key=lambda x: (x.meta.get("is_proper", False), x.score),
-            reverse=True,
-        )
-
-        # Step 6: Final processing loop with validation and de-duplication.
-        seen_strings = set()
-        results: List[Tuple[str, float, int, int]] = []
-        for current_ans in ranked_candidates:
-            if current_ans.data is None:
-                continue
-
-            clean_span = current_ans.data.strip(string.punctuation + string.whitespace)
-
-            if self._is_valid_instance(clean_span, abstract_concept):
-                if clean_span and clean_span.lower() not in seen_strings:
-                    # Get start and end from the .document_offset attribute, handling None.
-                    start_pos = (
-                        current_ans.document_offset.start
-                        if current_ans.document_offset
-                        else -1
-                    )
-                    end_pos = (
-                        current_ans.document_offset.end
-                        if current_ans.document_offset
-                        else -1
-                    )
-                    results.append(
-                        (clean_span, round(current_ans.score, 4), start_pos, end_pos)
-                    )
-                    seen_strings.add(clean_span.lower())
-
-        return results
-
+#
+# @component
+# class QuestionGenerator:
+#     """
+#     Generates a set of varied, natural-language questions to guide the
+#     ExtractiveReader, improving its ability to find diverse instances.
+#     """
+#
+#     @component.output_types(questions=List[str])
+#     def run(
+#         self, abstract_concept: str, explanation: Optional[str] = None
+#     ) -> Dict[str, Any]:
+#         """
+#         Generates questions based on the abstract concept.
+#         :param abstract_concept: The concept to find instances of.
+#         :param explanation: An optional explanation of the abstract concept.
+#         :return: A dictionary containing a list of questions.
+#         """
+#         if not isinstance(abstract_concept, str) or not abstract_concept:
+#             logging.warning("QuestionGenerator received an invalid abstract_concept.")
+#             return {"questions": []}
+#
+#         # Generate a plural form for more natural-sounding questions.
+#         if (
+#             abstract_concept.endswith("y")
+#             and len(abstract_concept) > 1
+#             and abstract_concept[-2] not in "aeiou"
+#         ):
+#             plural_concept = f"{abstract_concept[:-1]}ies"
+#         elif abstract_concept.endswith(("s", "x", "z", "ch", "sh")):
+#             plural_concept = f"{abstract_concept}es"
+#         else:
+#             plural_concept = f"{abstract_concept}s"
+#
+#         # Create a context-setting prefix if an explanation is provided.
+#         prefix = ""
+#         if explanation:
+#             prefix = f"A {abstract_concept} {explanation}. "
+#
+#         # A set of diverse questions to improve the model's recall.
+#         questions = [
+#             f"{prefix}. Which instances of {abstract_concept} are mentioned in the text?",
+#             f"{prefix}. Which {plural_concept} are described in the passage?",
+#             # f"{prefix}. What specific {plural_concept} are listed in the document?",
+#             # f"{prefix}. Identify the names of the {plural_concept} in the text.",
+#         ]
+#         return {"questions": questions}
+#
+#
+# @component
+# class AnswerFilter:
+#     """
+#     Filters and refines a list of Haystack Answers using score normalization
+#     and span containment to find the best candidate answers.
+#     """
+#
+#     @staticmethod
+#     def _is_overlapping(answer1: Answer, answer2: Answer) -> bool:
+#         """
+#         Checks if one answer's span is fully contained within the other.
+#         This is a static method as its logic does not depend on the state
+#         of an AnswerFilter instance.
+#         """
+#         # Ensure both answers have valid document_offset attributes to compare.
+#         if not all(
+#             hasattr(ans, "document_offset") and ans.document_offset
+#             for ans in [answer1, answer2]
+#         ):
+#             return False
+#         start1, end1 = answer1.document_offset.start, answer1.document_offset.end
+#         start2, end2 = answer2.document_offset.start, answer2.document_offset.end
+#
+#         return (start1 >= start2 and end1 <= end2) or (
+#             start2 >= start1 and end2 <= end1
+#         )
+#
+#     @component.output_types(filtered_answers=List[Answer])
+#     def run(self, answers: List[Answer]) -> Dict[str, Any]:
+#         """
+#         Filters answers using score normalization and span containment.
+#         :param answers: A list of Answer objects from the reader.
+#         :return: A dictionary containing the filtered list of answers.
+#         """
+#         # Calculate a normalized score to penalize overly long answers.
+#         for ans_item in answers:
+#             if ans_item.data:
+#                 # Add a small constant to length to avoid division by zero or log(1) issues.
+#                 ans_item.meta["normalized_score"] = ans_item.score / math.log(
+#                     len(ans_item.data) + 1.1
+#                 )
+#             else:
+#                 ans_item.meta["normalized_score"] = 0
+#
+#         # Sort by the new normalized score to prioritize concise, high-confidence answers.
+#         sorted_answers = sorted(
+#             answers, key=lambda x: x.meta.get("normalized_score", 0), reverse=True
+#         )
+#
+#         # Filter out overlapping answers, keeping the one with the higher normalized score.
+#         final_answers: List[Answer] = []
+#         for candidate_answer in sorted_answers:
+#             if candidate_answer.data is None:
+#                 continue
+#             if not any(
+#                 self._is_overlapping(candidate_answer, kept_answer)
+#                 for kept_answer in final_answers
+#             ):
+#                 final_answers.append(candidate_answer)
+#         return {"filtered_answers": final_answers}
+#
+#
+# class ExpertInstanceExtractor(ROASTDriver):
+#     """
+#     Orchestrates Haystack components and applies advanced heuristic filtering
+#     to perform highly accurate instance extraction.
+#     """
+#
+#     def __init__(
+#         self,
+#         model_name_or_path: str,
+#         device: Optional[str] = None,
+#         reader_top_k: int = 20,
+#         score_threshold: float = 0.0,
+#     ):
+#         self.q_gen = QuestionGenerator()
+#         self.reader = ExtractiveReader(
+#             model=model_name_or_path, device=device, top_k=reader_top_k, no_answer=True
+#         )
+#         self.filter = AnswerFilter()
+#         self.reader.warm_up()
+#         self.score_threshold = score_threshold
+#
+#         # An expanded set of "function words" to better identify descriptive phrases.
+#         self.FUNCTION_WORDS = {
+#             "a",
+#             "an",
+#             "the",
+#             "in",
+#             "on",
+#             "of",
+#             "for",
+#             "to",
+#             "with",
+#             "by",
+#             "at",
+#             "is",
+#             "are",
+#             "was",
+#             "were",
+#             "be",
+#             "been",
+#             "being",
+#             "have",
+#             "has",
+#             "had",
+#             "do",
+#             "does",
+#             "did",
+#             "will",
+#             "would",
+#             "should",
+#             "can",
+#             "could",
+#             "may",
+#             "might",
+#             "must",
+#             "one",
+#             "two",
+#             "three",
+#             "four",
+#             "five",
+#             "six",
+#             "seven",
+#             "eight",
+#             "nine",
+#             "ten",
+#             "some",
+#             "any",
+#             "all",
+#             "several",
+#             "many",
+#             "few",
+#             "other",
+#             "another",
+#             "various",
+#             "its",
+#             "their",
+#             "my",
+#             "your",
+#             "his",
+#             "her",
+#             "first",
+#             "second",
+#             "third",
+#             "last",
+#             "next",
+#             "former",
+#             "latter",
+#             "main",
+#             "largest",
+#             "smallest",
+#             "older",
+#             "newer",
+#             "red",
+#             "green",
+#             "blue",
+#             "named",
+#             "called",
+#             "known",
+#             "described",
+#             "including",
+#             "such",
+#             "as",
+#             "and",
+#             "or",
+#             "but",
+#             "performance-critical",
+#             "sections",
+#         }
+#         logging.info("ExpertInstanceExtractor components are initialized and ready.")
+#
+#     def _is_valid_instance(self, span_to_check: str, abstract_concept: str) -> bool:
+#         """
+#         A final, intelligent validation gate to ensure the answer is a clean entity.
+#         :param span_to_check: The cleaned answer string.
+#         :param abstract_concept: The original concept being searched for.
+#         :return: True if the span is a valid instance, False otherwise.
+#         """
+#         words = span_to_check.lower().split()
+#
+#         # Rule 1: Must not be excessively long (e.g., more than 3 words).
+#         if len(words) > 3:
+#             return False
+#
+#         # Rule 2: Must not be an "echo" of the abstract concept.
+#         abstract_words = set(abstract_concept.lower().split())
+#         if abstract_words.issubset(set(words)):
+#             return False
+#
+#         # Rule 3: Must contain at least one "substantive" word.
+#         if not any(word not in self.FUNCTION_WORDS for word in words):
+#             return False
+#
+#         return True
+#
+#     def extract(
+#         self,
+#         context: str,
+#         abstract_concept: str,
+#         explanation_of_abstract: Optional[str] = None,
+#     ) -> List[Tuple[str, float, int, int]]:
+#         """
+#         Runs the full extraction and filtering pipeline.
+#         :param context: The text to search within.
+#         :param abstract_concept: The abstract concept to find instances of.
+#         :param explanation_of_abstract: An optional explanation of the abstract concept.
+#         :return: A list of tuples, each containing (instance, score, start_offset, end_offset).
+#         """
+#         if not context or not abstract_concept:
+#             return []
+#         docs = [Document(content=context)]
+#         questions = self.q_gen.run(
+#             abstract_concept=abstract_concept, explanation=explanation_of_abstract
+#         )["questions"]
+#
+#         # Step 1: Gather all possible answers from the reader for all questions.
+#         all_raw_answers: List[Answer] = []
+#         for query_text in questions:
+#             try:
+#                 reader_result = self.reader.run(query=query_text, documents=docs)
+#                 all_raw_answers.extend(reader_result.get("answers", []))
+#             except Exception as e:
+#                 logging.error(f"Error running reader for question '{query_text}': {e}")
+#                 continue
+#
+#         # Step 2: Apply the score threshold early for efficiency.
+#         thresholded_answers = [
+#             ans for ans in all_raw_answers if ans.score >= self.score_threshold
+#         ]
+#
+#         # Step 3: Run the initial filtering component.
+#         filter_result = self.filter.run(answers=thresholded_answers)
+#         candidate_answers = filter_result["filtered_answers"]
+#
+#         # Step 4: Add a 'is_proper' flag to metadata for ranking.
+#         for ans_item in candidate_answers:
+#             if ans_item.data and ans_item.data[0].isupper():
+#                 ans_item.meta["is_proper"] = True
+#             else:
+#                 ans_item.meta["is_proper"] = False
+#
+#         # Step 5: Re-rank candidates, prioritizing proper nouns, then by original score.
+#         ranked_candidates = sorted(
+#             candidate_answers,
+#             key=lambda x: (x.meta.get("is_proper", False), x.score),
+#             reverse=True,
+#         )
+#
+#         # Step 6: Final processing loop with validation and de-duplication.
+#         seen_strings = set()
+#         results: List[Tuple[str, float, int, int]] = []
+#         for current_ans in ranked_candidates:
+#             if current_ans.data is None:
+#                 continue
+#
+#             clean_span = current_ans.data.strip(string.punctuation + string.whitespace)
+#
+#             if self._is_valid_instance(clean_span, abstract_concept):
+#                 if clean_span and clean_span.lower() not in seen_strings:
+#                     # Get start and end from the .document_offset attribute, handling None.
+#                     start_pos = (
+#                         current_ans.document_offset.start
+#                         if current_ans.document_offset
+#                         else -1
+#                     )
+#                     end_pos = (
+#                         current_ans.document_offset.end
+#                         if current_ans.document_offset
+#                         else -1
+#                     )
+#                     results.append(
+#                         (clean_span, round(current_ans.score, 4), start_pos, end_pos)
+#                     )
+#                     seen_strings.add(clean_span.lower())
+#
+#         return results
+#
 
 # 1. Defines the core role and behavior for the model.
 SYSTEM_BEHAVIOR_PROMPT = """

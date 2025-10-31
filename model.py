@@ -48,7 +48,7 @@ class RoBERTaMultiTaskClassifier(pl.LightningModule):
         )
         # Tokenizer needs to be part of the model for easy prediction
         self.tokenizer = RobertaTokenizer.from_pretrained(
-            model_name, local_files_only=True
+            model_name
         )
 
         self.sense_classifier = ClassificationHead(

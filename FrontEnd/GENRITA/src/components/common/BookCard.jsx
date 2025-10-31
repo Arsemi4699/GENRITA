@@ -15,7 +15,7 @@ const BookCard = ({ book, onClick }) => {
             </div>
             {statusLabel && <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm ${labelStyles[statusLabel] || 'bg-gray-400/80'}`}>{statusLabel}</div>}
             <h3 className="mt-2 text-sm font-semibold text-[var(--color-text-primary)] truncate">{book.title}</h3>
-            <p className="text-xs text-[var(--color-text-muted)] truncate">{book.author}</p>
+            <p className="text-xs text-[var(--color-text-muted)] truncate">{book.authorName}</p>
         </div>
     );
 }

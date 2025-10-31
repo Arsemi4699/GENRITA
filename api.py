@@ -5,11 +5,12 @@ from uuid import uuid4
 import threading
 import redis
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
 from schema import *
 from GRP import GRPipeline
-
-
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 # --- Basic Configuration ---
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
@@ -32,6 +33,19 @@ app = FastAPI(
     version="2.0.0",
 )
 
+origins = [
+    "https://arsemi.qzz.io",  # دامنه React شما
+    "https://eivazi.qzz.io/",
+    "http://localhost:3000",  # برای توسعه لوکال
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # دامنه‌های مجاز
+    allow_credentials=True,     # اجازه ارسال کوکی/authorization
+    allow_methods=["*"],        # مجاز به همه متدها: GET, POST, PUT, ...
+    allow_headers=["*"],        # مجاز به همه هدرها
+)
 
 # --- Redis Connection ---
 try:
@@ -230,6 +244,26 @@ async def download_job_result(job_id: str):
         path=result_path, filename=Path(result_path).name, media_type="application/json"
     )
 
+
+# ------------------------
+# ✅ Serve React build (frontend)
+# ------------------------
+static_path = os.path.join(os.path.dirname(__file__), "FrontEnd/GENRITA/dist")
+app.mount("/assets", StaticFiles(directory=os.path.join(static_path, "assets")), name="assets")
+
+@app.get("/{full_path:path}")
+async def serve_react(full_path: str):
+    """
+    Serve index.html for any route that isn't an API or a real static file.
+    """
+    file_path = os.path.join(static_path, full_path)
+
+    # اگر فایل واقعی وجود داشت، همون رو بده
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+
+    # در غیر این صورت index.html بده (برای React Router)
+    return FileResponse(os.path.join(static_path, "index.html"))
 
 # To run this application:
 #    uvicorn api:app --reload

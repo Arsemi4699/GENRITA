@@ -1,0 +1,2 @@
+[console_scripts]
+git2md = git2md:main
